@@ -2892,7 +2892,7 @@ window.getArabicLeaveMonthIndex = function(dateStr) {
 // أول ما طلب إجازة (عارضة/اعتيادية) يتوافق عليه هنا، بنبعت تسجيل مباشر لنفس الشيت الحي
 // اللي النوبتجيات بتقرأ/تكتب منه، عشان الاتنين يفضلوا متزامنين على نفس المصدر.
 // ============================================================
-window.LEAVE_SYNC_URL = 'https://script.google.com/macros/s/AKfycbzlcoGGT2rFMQlyNxxih7hpTcmm-BrZpAY0BDAZPy2Dti-LZbo-UnGEPZ98Xj6WRZRofw/exec';
+window.LEAVE_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxEbF2WCC2dINPWVG63t3fy8mZMlUi3IdX3NkzCvii7-bPak5z0In52Fva5WwblFdHC/exec';
 
 // ==================== جسر الطلبات المشتركة بين الموارد البشرية والنوبتجيات ====================
 // (يستخدم نفس GAS الحي بتاع رصيد الإجازات — LEAVE_SYNC_URL — بإضافة أكشنات:
@@ -2923,6 +2923,7 @@ window.pushSharedRequest = async function(localId, payload) {
         sourceSystem: window._SOURCE_SYSTEM,
         dept: payload.dept || '',
         requestedBy: payload.requestedBy || '',
+        supervisorName: payload.supervisorName || '',
         submittedAt: new Date().toISOString(),
         category: payload.category || ''
       })
@@ -2986,6 +2987,60 @@ window.fetchRemoteSharedRequests = async function(statusList) {
         submittedAt: it.submittedAt
       }));
   } catch (e) { console.log('تعذر جلب الطلبات من النظام الآخر:', e); return []; }
+};
+
+// ==================== جسر "موظفين جدد" — إبلاغ نظام النوبتجيات بأي موظف جديد يتضاف هنا ====================
+// (نفس الأكشن اللي بيستخدمه نظام النوبتجيات: logNewStaffCandidate — بنفس الشكل: name/dept/sourceSystem/addedBy)
+window.logNewStaffCandidate = async function(dept, name) {
+  if (!window.LEAVE_SYNC_URL || !dept || !name) return;
+  try {
+    await fetch(window.LEAVE_SYNC_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'logNewStaffCandidate',
+        dept, name,
+        sourceSystem: window._SOURCE_SYSTEM,
+        addedBy: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : ''
+      })
+    });
+  } catch (e) { console.log('تعذر إبلاغ نظام النوبتجيات بالموظف الجديد:', e); }
+};
+
+// ==================== جسر "موظفين جدد" الوارد من النوبتجيات ====================
+// يجيب قائمة الموظفين الجدد اللي اتضافوا من نظام النوبتجيات ولسه محتاجين مراجعة/استيراد هنا
+// (شكل الرد من الباك إند: { ok, source, items:[{id,name,dept,sourceSystem,addedBy,addedAt,status,...}] })
+window.getNewStaffCandidates = async function() {
+  if (!window.LEAVE_SYNC_URL) return [];
+  try {
+    const res = await fetch(window.LEAVE_SYNC_URL + '?action=getNewStaffCandidates&status=pending');
+    const j = await res.json();
+    const items = Array.isArray(j?.items) ? j.items : [];
+    // نعرض فقط المرشحين الواردين من نظام النوبتجيات (لا نعرض للأدمن هنا الموظفين اللي هو نفسه أضافهم في الموارد)
+    return items.filter(it => it.sourceSystem === 'shifts');
+  } catch (e) { console.log('تعذر جلب الموظفين الجدد:', e); return []; }
+};
+
+// يُستخدم بعد استيراد الموظف فعليًا لقائمة الموارد البشرية — يعلّم المرشح كمستورد عشان يختفي من القائمة
+// (الباك إند بياخد id + importedBy، مش candidateId/decidedBy)
+window.markStaffCandidateImported = async function(id, dept) {
+  if (!window.LEAVE_SYNC_URL || !id) return;
+  try {
+    await fetch(window.LEAVE_SYNC_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'markStaffCandidateImported', id, dept: dept || '', importedBy: currentUser || '' })
+    });
+  } catch (e) { console.log('تعذر تحديث حالة المرشح (مستورد):', e); }
+};
+
+// يُستخدم لو الأدمن قرر تجاهل المرشح (اسم مكرر / خطأ إدخال) من غير استيراد
+window.markStaffCandidateDismissed = async function(id) {
+  if (!window.LEAVE_SYNC_URL || !id) return;
+  try {
+    await fetch(window.LEAVE_SYNC_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'markStaffCandidateDismissed', id, dismissedBy: currentUser || '' })
+    });
+  } catch (e) { console.log('تعذر تحديث حالة المرشح (تجاهل):', e); }
 };
 
 // يقرأ الشيت المشترك ويحدّث حالة الطلبات المحلية "قيد الانتظار" اللي اتغيّرت حالتها
@@ -3440,7 +3495,13 @@ window.leaveApprovalApprove = async function(id, remoteData) {
     const docSnap = snap.docs.find(d => d.id === id);
     if (!docSnap) { showToast('⚠️ الطلب غير موجود'); return; }
     const data = docSnap.data();
-    await updateDoc(doc(db, 'requests', id), { status: 'approved', finalApprovedBy: currentUser, finalApprovedAt: serverTimestamp() });
+    // منع الاعتماد المكرر: لو الطلب اتعمله اعتماد وخصم رصيد قبل كده، منعيدش الخصم تاني
+    if (data.balanceRegistered) {
+      showToast('⚠️ الطلب معتمد بالفعل — تم منع تكرار الخصم من الرصيد');
+      window.loadApprovalsList(window._approvalsCurrentBucket || 'pending', window._approvalsCurrentCat);
+      return;
+    }
+    await updateDoc(doc(db, 'requests', id), { status: 'approved', balanceRegistered: true, finalApprovedBy: currentUser, finalApprovedAt: serverTimestamp() });
     // ربط الاعتماد برصيد شيت الإجازات (لو الطلب إجازة عارضة/اعتيادية)
     await window.applyApprovedLeaveToBalance({ ...data, id });
     // تحديث حالة الطلب في الشيت المشترك عشان يظهر معتمد فورًا في نظام النوبتجيات
@@ -4072,9 +4133,18 @@ window.printSection = function() {
         if (data.supervisorName) await sendNotification(data.supervisorName, '🎉 اعتماد نهائي', `تم اعتماد جدول ${data.category||''} المرفوع من ${data.username||''}`, '', 'success');
         showToast('🎉 تم الاعتماد النهائي وإرسال الإشعارات');
       } else {
+        // منع الاعتماد المكرر: لو الطلب اتعمله خصم رصيد قبل كده (من نفس الشاشة أو شاشة الموافقات التانية)، منعيدش الخصم تاني
+        try {
+          const freshSnap = await getDoc(doc(db, 'requests', String(id)));
+          if (freshSnap.exists() && freshSnap.data().balanceRegistered) {
+            showToast('⚠️ الطلب معتمد بالفعل — تم منع تكرار الخصم من الرصيد');
+            renderApprovals();
+            return;
+          }
+        } catch(e) { console.log('duplicate-check error', e); }
         // تحديث الطلب في Firebase
         try {
-          await updateDoc(doc(db, 'requests', String(id)), { status: 'approved', finalApprovedBy: currentUser, finalApprovedAt: serverTimestamp() });
+          await updateDoc(doc(db, 'requests', String(id)), { status: 'approved', balanceRegistered: true, finalApprovedBy: currentUser, finalApprovedAt: serverTimestamp() });
         } catch(e) { console.log('update req error', e); }
         
         const index = allRequests.findIndex(r => String(r.id) === String(id));
@@ -4387,6 +4457,8 @@ window.printSection = function() {
         const deptKey = dept.replace(/\//g, '_');
         await setDoc(doc(db, 'staff_custom', deptKey), { dept, staff: DOCTORS_DATA[dept] });
       } catch(e) { console.log('Firebase save error:', e); }
+      // إبلاغ نظام النوبتجيات بالموظف الجديد عشان يظهر في "موظفين جدد من الموارد البشرية" هناك
+      if (typeof window.logNewStaffCandidate === 'function') window.logNewStaffCandidate(dept, name.trim());
     }
   };
 
@@ -6511,6 +6583,7 @@ window.renderUsersHub = function() {
     { icon:'🧾', title:'سجل إجراءات الأدمن', sub:'كل إجراء فعلي مسجَّل بمعرفة الأدمن الذي نفَّذه', fn:'openAdminLog', colors:['#4e342e','#6d4c41'] },
     { icon:'🔒', title:'ملفات خاصة', sub:'إدارة الملفات السرية للمستشفى', fn:'renderSecret', colors:['#4a148c','#6a1b9a'] },
     { icon:'📊', title:'الإحصاء الطبي والحوكمة', sub:'الموافقات • الاستعلامات • حوكمة الإجراءات', fn:'renderStatsGovernanceHub', colors:['#0b3d91','#17a2c9'] },
+    { icon:'🆕', title:'موظفين جدد', sub:'مراجعة الموظفين المضافين من نظام النوبتجيات', fn:'renderNewStaffCandidates', colors:['#1a7d3a','#27ae60'] },
   ];
   openModal(`
     <div class="section-header">
@@ -6542,6 +6615,62 @@ window.renderUsersHub = function() {
 };
 
 window.comingSoonStats = function() { showToast('📊 الإحصاء الطبي والحوكمة — قريباً'); };
+
+// ==================== 8أ. موظفين جدد (واردين من نظام النوبتجيات) ====================
+window.renderNewStaffCandidates = async function() {
+  if (currentUserData?.type !== 'admin') { showToast('⛔ هذا القسم للمدير العام (Admin) فقط'); return; }
+  openModal(`
+    <div class="section-header">
+      <h2>🆕 موظفين جدد من نظام النوبتجيات</h2>
+      <button class="back-btn" onclick="renderUsersHub()">→ رجوع للوحة الحوكمة</button>
+    </div>
+    <div id="newStaffCandidatesBox" style="text-align:center;padding:40px;color:#888">⏳ جاري التحميل...</div>
+  `);
+  let items = [];
+  try { items = await window.getNewStaffCandidates(); } catch(e) { items = []; }
+  const box = document.getElementById('newStaffCandidatesBox');
+  if (!box) return;
+  if (!items.length) {
+    box.innerHTML = `<div style="text-align:center;padding:40px;color:#888">✅ لا يوجد موظفين جدد بانتظار المراجعة حاليًا</div>`;
+    return;
+  }
+  box.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px;max-width:800px;margin:0 auto">
+      ${items.map(it => `
+        <div style="border:1.5px solid #d5e8d5;border-radius:16px;padding:16px 20px;background:linear-gradient(145deg,#fff,#f6fff6);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:900;font-size:1.05rem;color:#1a7d3a">${it.name || '—'}</div>
+            <div style="font-size:0.85rem;color:#666;margin-top:4px">القسم: ${it.dept || '—'} • أُضيف بمعرفة: ${it.addedBy || '—'} • ${it.addedAt ? new Date(it.addedAt).toLocaleString('ar-EG') : ''}</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-action" style="background:#1a7d3a" onclick="window._importStaffCandidate('${it.id}','${(it.dept||'').replace(/'/g,"\\'")}','${(it.name||'').replace(/'/g,"\\'")}')">✅ استيراد للموارد البشرية</button>
+            <button class="btn-action" style="background:#a94442" onclick="window._dismissStaffCandidate('${it.id}')">🗑️ تجاهل</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+};
+
+window._importStaffCandidate = async function(id, dept, name) {
+  if (!dept || !name) { showToast('⛔ بيانات المرشح غير مكتملة'); return; }
+  if (!DOCTORS_DATA[dept]) DOCTORS_DATA[dept] = [];
+  if (!DOCTORS_DATA[dept].includes(name)) DOCTORS_DATA[dept].push(name);
+  try {
+    const deptKey = dept.replace(/\//g, '_');
+    await setDoc(doc(db, 'staff_custom', deptKey), { dept, staff: DOCTORS_DATA[dept] });
+  } catch(e) { console.log('Firebase save error:', e); }
+  await window.markStaffCandidateImported(id, dept);
+  showToast('✅ تم استيراد الموظف لقائمة الموارد البشرية');
+  window.renderNewStaffCandidates();
+};
+
+window._dismissStaffCandidate = async function(id) {
+  if (!confirm('تجاهل هذا الموظف بدون استيراده؟')) return;
+  await window.markStaffCandidateDismissed(id);
+  showToast('🗑️ تم التجاهل');
+  window.renderNewStaffCandidates();
+};
 
 // ==================== 8ب. الإحصاء الطبي والحوكمة (لوحة رئيسية) ====================
 window.renderStatsGovernanceHub = function() {

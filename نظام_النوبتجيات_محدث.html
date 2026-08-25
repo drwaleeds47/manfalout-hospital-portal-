@@ -1896,7 +1896,7 @@ let USERS = {
 
   // ==================== ربط شيت الإجازات (رصيد العارضة والاعتيادية) ====================
   // بعد نشر Google Apps Script Web App على شيت "الاجازات.xlsx" حط رابط الـ /exec هنا
-  const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzlcoGGT2rFMQlyNxxih7hpTcmm-BrZpAY0BDAZPy2Dti-LZbo-UnGEPZ98Xj6WRZRofw/exec';
+  const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxEbF2WCC2dINPWVG63t3fy8mZMlUi3IdX3NkzCvii7-bPak5z0In52Fva5WwblFdHC/exec';
   window.GAS_WEB_APP_URL = GAS_WEB_APP_URL;
 
   // ==================== جسر الطلبات المشتركة بين النوبتجيات والموارد البشرية ====================
@@ -1928,6 +1928,7 @@ let USERS = {
           sourceSystem: window._SOURCE_SYSTEM,
           dept: payload.dept || '',
           requestedBy: payload.requestedBy || '',
+          supervisorName: payload.supervisorName || '',
           submittedAt: new Date().toISOString(),
           category: payload.category || ''
         })
@@ -1988,9 +1989,149 @@ let USERS = {
           details: it.details,
           status: it.status,
           requestedBy: it.requestedBy,
+          supervisorName: it.supervisorName || '',
           submittedAt: it.submittedAt
         }));
     } catch (e) { console.log('تعذر جلب الطلبات من النظام الآخر:', e); return []; }
+  };
+
+  // ==================== جسر "موظفين جدد" — إبلاغ الموارد البشرية بأي موظف جديد يتضاف هنا ====================
+  // (المطابقة لأكشن logNewStaffCandidate في الباك إند: name/dept/sourceSystem/addedBy/addedAt —
+  //  الـ id بيتولد من الباك إند نفسه، مش محتاجين نبعته)
+  window.logNewStaffCandidate = async function(dept, name) {
+    if (!GAS_WEB_APP_URL || !dept || !name) return;
+    try {
+      await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'logNewStaffCandidate',
+          dept, name,
+          sourceSystem: window._SOURCE_SYSTEM,
+          addedBy: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : ''
+        })
+      });
+    } catch (e) { console.log('تعذر إبلاغ الموارد البشرية بالموظف الجديد:', e); }
+  };
+
+  // يجيب قائمة الموظفين الجدد اللي اتضافوا من نظام الموارد البشرية ولسه محتاجين مراجعة/استيراد هنا
+  window.getNewStaffCandidatesFromHR = async function() {
+    if (!GAS_WEB_APP_URL) return [];
+    try {
+      const res = await fetch(GAS_WEB_APP_URL + '?action=getNewStaffCandidates&status=pending');
+      const j = await res.json();
+      const items = Array.isArray(j?.items) ? j.items : [];
+      return items.filter(it => it.sourceSystem === 'hr');
+    } catch (e) { console.log('تعذر جلب الموظفين الجدد من الموارد البشرية:', e); return []; }
+  };
+
+  // يُستخدم بعد استيراد الموظف فعليًا لقائمة النوبتجيات — يعلّم المرشح كمستورد عشان يختفي من القائمة
+  window.markStaffCandidateImported = async function(id, dept) {
+    if (!GAS_WEB_APP_URL || !id) return;
+    try {
+      await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'markStaffCandidateImported', id, dept: dept || '', importedBy: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : '' })
+      });
+    } catch (e) { console.log('تعذر تحديث حالة المرشح (مستورد):', e); }
+  };
+
+  // يُستخدم لو الأدمن قرر تجاهل المرشح (اسم مكرر / خطأ إدخال) من غير استيراد
+  window.markStaffCandidateDismissed = async function(id) {
+    if (!GAS_WEB_APP_URL || !id) return;
+    try {
+      await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'markStaffCandidateDismissed', id, dismissedBy: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : '' })
+      });
+    } catch (e) { console.log('تعذر تحديث حالة المرشح (تجاهل):', e); }
+  };
+
+  // ==================== جسر إجازات الموارد البشرية المعتمدة — تُطبَّق على النوبتجيات ====================
+  // نجيب الطلبات المعتمدة (اعتيادية/عارضة) الواردة من نظام الموارد البشرية فقط، ونبنيها في خريطة
+  // بمفتاح "الاسم|التاريخ" عشان نقدر نطابقها بسرعة مع أي خانة في الجدول الشهري
+  window._hrApprovedLeavesMap = {};
+  window.loadHRApprovedLeaves = async function() {
+    if (!GAS_WEB_APP_URL) return window._hrApprovedLeavesMap;
+    try {
+      const res = await fetch(GAS_WEB_APP_URL + '?action=getSharedRequests&status=approved');
+      const j = await res.json();
+      const items = Array.isArray(j?.items) ? j.items : [];
+      const leaveTypes = ['إجازة اعتيادية', 'إجازة عارضة'];
+      const map = {};
+      items.forEach(it => {
+        if (it.sourceSystem === 'hr' && it.name && it.date && leaveTypes.some(t => (it.type || '').includes(t))) {
+          map[it.name.trim() + '|' + it.date] = it;
+        }
+      });
+      window._hrApprovedLeavesMap = map;
+    } catch (e) { console.log('تعذر تحميل إجازات الموارد البشرية المعتمدة:', e); }
+    return window._hrApprovedLeavesMap;
+  };
+  // يتأكد هل موظف معين على إجازة معتمدة من الموارد البشرية في تاريخ معين (yyyy-mm-dd)
+  window.checkStaffOnHRLeave = function(name, dateStr) {
+    if (!name || !dateStr) return null;
+    return window._hrApprovedLeavesMap[name.trim() + '|' + dateStr] || null;
+  };
+
+  // ==================== شاشة مراجعة/استيراد الموظفين الجدد الواردين من الموارد البشرية ====================
+  window.renderNewStaffCandidatesFromHR = async function() {
+    if (currentUserData?.type !== 'admin') { showToast('⛔ هذا القسم للأدمن فقط'); return; }
+    showModal(`
+      <div class="section-header">
+        <h2>🆕 موظفين جدد من الموارد البشرية</h2>
+        <button class="back-btn" onclick="renderUsersHub()">→ رجوع للوحة الحوكمة</button>
+      </div>
+      <div id="newStaffFromHRBox" style="text-align:center;padding:40px;color:#888">⏳ جاري التحميل...</div>
+    `);
+    let items = [];
+    try { items = await window.getNewStaffCandidatesFromHR(); } catch(e) { items = []; }
+    const box = document.getElementById('newStaffFromHRBox');
+    if (!box) return;
+    if (!items.length) {
+      box.innerHTML = `<div style="text-align:center;padding:40px;color:#888">✅ لا يوجد موظفين جدد بانتظار المراجعة حاليًا</div>`;
+      return;
+    }
+    box.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:800px;margin:0 auto">
+        ${items.map(it => `
+          <div style="border:1.5px solid #d5e8d5;border-radius:16px;padding:16px 20px;background:linear-gradient(145deg,#fff,#f6fff6);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:900;font-size:1.05rem;color:#1a7d3a">${it.name || '—'}</div>
+              <div style="font-size:0.85rem;color:#666;margin-top:4px">القسم المقترح: ${it.dept || '—'} • أُضيف بمعرفة: ${it.addedBy || '—'} • ${it.addedAt ? new Date(it.addedAt).toLocaleString('ar-EG') : ''}</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="hrCandDept_${it.id}" style="padding:8px 10px;border:2px solid #ddd;border-radius:10px;font-family:inherit;font-weight:700">
+                ${Object.keys(DOCTORS_DATA).map(d => `<option value="${d}" ${d===it.dept?'selected':''}>${d}</option>`).join('')}
+              </select>
+              <button class="btn-action" style="background:#1a7d3a" onclick="window._importStaffCandidateFromHR('${it.id}','${(it.name||'').replace(/'/g,"\\'")}')">✅ استيراد للنوبتجيات</button>
+              <button class="btn-action" style="background:#a94442" onclick="window._dismissStaffCandidateFromHR('${it.id}')">🗑️ تجاهل</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  };
+
+  window._importStaffCandidateFromHR = async function(id, name) {
+    const deptSel = document.getElementById('hrCandDept_' + id);
+    const dept = deptSel ? deptSel.value : '';
+    if (!dept || !name) { showToast('⛔ اختر القسم أولاً'); return; }
+    if (!DOCTORS_DATA[dept]) DOCTORS_DATA[dept] = [];
+    if (!DOCTORS_DATA[dept].includes(name)) DOCTORS_DATA[dept].push(name);
+    try {
+      const deptKey = dept.replace(/\//g, '_');
+      await setDoc(doc(db, 'staff_custom', deptKey), { dept, staff: DOCTORS_DATA[dept] });
+    } catch(e) { console.log('Firebase save error:', e); }
+    if (typeof window.markStaffCandidateImported === 'function') await window.markStaffCandidateImported(id, dept);
+    showToast('✅ تم استيراد الموظف لقائمة النوبتجيات');
+    window.renderNewStaffCandidatesFromHR();
+  };
+
+  window._dismissStaffCandidateFromHR = async function(id) {
+    if (!confirm('تجاهل هذا الموظف بدون استيراده؟')) return;
+    if (typeof window.markStaffCandidateDismissed === 'function') await window.markStaffCandidateDismissed(id);
+    showToast('🗑️ تم التجاهل');
+    window.renderNewStaffCandidatesFromHR();
   };
 
   // يقرأ الشيت المشترك ويحدّث حالة الطلبات المحلية "قيد الانتظار" اللي اتغيّرت حالتها
@@ -2014,8 +2155,15 @@ let USERS = {
           try {
             if (remote.status === 'approved') {
               await updateDoc(doc(db, 'requests', d.id), { status: 'approved', finalApprovedBy: remote.decidedBy || '', finalApprovedAt: serverTimestamp() });
+              // ── لو الطلب ده جدول من "الإدارة الإشرافية" واعتمده الأدمن من النظام التاني — نرقّي المسودة هنا محليًا ──
+              if (data.supervisionDraftId && typeof window._supv_promoteDraftToApproved === 'function') {
+                window._supv_promoteDraftToApproved(data.supervisionDraftId, data.supervisionTeamId);
+              }
             } else if (remote.status === 'rejected') {
               await updateDoc(doc(db, 'requests', d.id), { status: 'rejected', rejectedBy: remote.decidedBy || '', rejectReason: remote.rejectReason || '', rejectedAt: serverTimestamp() });
+              if (data.supervisionDraftId && typeof window._supv_discardDraft === 'function') {
+                window._supv_discardDraft(data.supervisionDraftId);
+              }
             }
           } catch (e) { console.log('تعذر تحديث الحالة المحلية من الجسر:', e); }
         }
@@ -2306,11 +2454,24 @@ let USERS = {
         renderApprovals();
         return;
       } else {
+        // منع الاعتماد المكرر: لو الطلب اتعمله خصم رصيد قبل كده، منعيدش الخصم تاني
+        try {
+          const freshSnap = await getDoc(doc(db, 'requests', String(id)));
+          if (freshSnap.exists() && freshSnap.data().balanceRegistered) {
+            showToast('⚠️ الطلب معتمد بالفعل — تم منع تكرار الخصم من الرصيد');
+            renderApprovals();
+            return;
+          }
+        } catch(e) { console.log('duplicate-check error', e); }
         // تحديث الطلب في Firebase
         try {
-          await updateDoc(doc(db, 'requests', String(id)), { status: 'approved', finalApprovedBy: currentUser, finalApprovedAt: serverTimestamp() });
+          await updateDoc(doc(db, 'requests', String(id)), { status: 'approved', balanceRegistered: true, finalApprovedBy: currentUser, finalApprovedAt: serverTimestamp() });
         } catch(e) { console.log('update req error', e); }
         if (data.sharedId) window.syncSharedRequestStatus(data.sharedId, 'approved', currentUser);
+        // ── لو الطلب ده جدول من "الإدارة الإشرافية" (وارد من شاشة إضافة النوبتجيات) — نرقّي مسودته لمعتمدة فورًا ──
+        if (data.supervisionDraftId && typeof window._supv_promoteDraftToApproved === 'function') {
+          window._supv_promoteDraftToApproved(data.supervisionDraftId, data.supervisionTeamId);
+        }
         
         const index = allRequests.findIndex(r => String(r.id) === String(id));
         if (index !== -1) {
@@ -2379,6 +2540,10 @@ let USERS = {
           await updateDoc(doc(db, 'requests', String(id)), { status: 'rejected', rejectedBy: currentUser, rejectReason: reason, rejectedAt: serverTimestamp() });
         } catch(e) { console.log('reject req fb error', e); }
         if (data.sharedId) window.syncSharedRequestStatus(data.sharedId, 'rejected', currentUser, reason);
+        // ── لو الطلب ده جدول من "الإدارة الإشرافية" — نحذف مسودته (اتّرفضت) ──
+        if (data.supervisionDraftId && typeof window._supv_discardDraft === 'function') {
+          window._supv_discardDraft(data.supervisionDraftId);
+        }
         
         const index = allRequests.findIndex(r => String(r.id) === String(id));
         if (index !== -1) {
@@ -2641,6 +2806,8 @@ let USERS = {
         const deptKey = dept.replace(/\//g, '_');
         await setDoc(doc(db, 'staff_custom', deptKey), { dept, staff: DOCTORS_DATA[dept] });
       } catch(e) { console.log('Firebase save error:', e); }
+      // إبلاغ الموارد البشرية بالموظف الجديد عشان يظهر في "موظفين جدد" هناك
+      if (typeof window.logNewStaffCandidate === 'function') window.logNewStaffCandidate(dept, name.trim());
     }
   };
 
@@ -3156,7 +3323,44 @@ let USERS = {
     } catch(e) { showToast('✅ تم الحفظ'); }
   };
 
+  // نبني تاريخ yyyy-mm-dd من (يوم/شهر/سنة) الجدول الشهري عشان نطابقه مع تواريخ إجازات الموارد البشرية
+  window._buildISODate = function(day, month, year) {
+    const d = String(day).padStart(2, '0');
+    const m = String(month).padStart(2, '0');
+    return `${year}-${m}-${d}`;
+  };
+
+  // فحص تعارض الجدول الشهري مع إجازات معتمدة من الموارد البشرية — يُستدعى عند النشر (رفع الجدول)
+  window._checkMonthlyScheduleAgainstHRLeaves = async function(month, year) {
+    if (typeof window.loadHRApprovedLeaves === 'function') await window.loadHRApprovedLeaves();
+    const rows = document.querySelectorAll('#monthlyScheduleRows tr');
+    const conflicts = [];
+    rows.forEach(row => {
+      const day = row.querySelector('.monthly-staff')?.dataset?.day;
+      const staff = row.querySelector('.monthly-staff')?.value?.trim();
+      if (!day || !staff) return;
+      const dateStr = window._buildISODate(day, month, year);
+      const leave = window.checkStaffOnHRLeave ? window.checkStaffOnHRLeave(staff, dateStr) : null;
+      if (leave) conflicts.push(`${staff} — يوم ${day} (${dateStr})`);
+    });
+    return conflicts;
+  };
+
   window.submitMonthlySchedule = async function(type, dept, shiftType, month, year) {
+    // ── مطابقة عند النشر: تحذير لو موظف مجدول في يوم عليه إجازة معتمدة من الموارد البشرية ──
+    try {
+      const conflicts = await window._checkMonthlyScheduleAgainstHRLeaves(month, year);
+      if (conflicts.length) {
+        const proceed = confirm(
+          '⚠️ تنبيه مطابقة مع الموارد البشرية:\n\n' +
+          conflicts.join('\n') +
+          '\n\nهؤلاء الموظفين لديهم إجازة معتمدة من الموارد البشرية في نفس اليوم المجدول.\n' +
+          'هل تريد المتابعة والرفع رغم ذلك؟'
+        );
+        if (!proceed) { showToast('⏸️ تم إلغاء الرفع لمراجعة التعارض'); return; }
+      }
+    } catch(e) { console.log('تعذر فحص تعارض الإجازات:', e); }
+
     await saveMonthlySchedule(type, dept, shiftType, month, year);
     try {
       const q = query(collection(db, 'shifts'), where('username', '==', currentUser), where('category', '==', dept), where('month', '==', month), where('year', '==', year), where('status', '==', 'draft'));
@@ -4567,6 +4771,8 @@ let USERS = {
     showToast('⏳ جاري تحميل الموافقات...');
     // نطابق حالة الطلبات المحلية "قيد الانتظار" مع الشيت المشترك أولاً (لو حد وافق/رفض من النظام الآخر)
     await window.reconcileLocalPendingStatuses();
+    // نحدّث محليًا خريطة إجازات الموارد البشرية المعتمدة عشان تبقى جاهزة لو حد فتح جدول شهري بعد كده
+    if (typeof window.loadHRApprovedLeaves === 'function') window.loadHRApprovedLeaves();
     try {
       if (uType === 'supervisor') {
         const shiftSnap = await getDocs(query(collection(db, 'shifts'), where('status', '==', 'pending_supervisor')));
@@ -4577,8 +4783,15 @@ let USERS = {
         // الطلبات
         const qSnap = await getDocs(query(collection(db, 'requests'), where('status', '==', 'pending_supervisor')));
         requests = qSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.supervisorName === currentUser);
-        const fbIds = new Set(requests.map(r => String(r.id)));
-        allRequests.filter(r => r.status === 'pending_supervisor' && r.supervisorName === currentUser && !fbIds.has(String(r.id))).forEach(r => requests.push(r));
+        // ملحوظة: تم إلغاء الدمج من allRequests هنا — id وهمي بـ Date.now() كان بيسبب
+        // ظهور "صورة" شبح للطلب حتى بعد اعتماده فعليًا. استعلام Firestore أعلاه كافٍ ومحدّث دائمًا.
+        // دمج الطلبات الواردة من نظام الموارد البشرية عبر الجسر المشترك واللي معلقة عند نفس رئيس القسم ده
+        const remoteSupReqs = await window.fetchRemoteSharedRequests(['pending_supervisor']);
+        requests = requests.concat(remoteSupReqs.filter(r => r.supervisorName === currentUser));
+        // ملحوظة: تم إلغاء الدمج من allRequests هنا لأنه كان يعيد إظهار طلبات "شبح" قديمة
+        // (id وهمي بـ Date.now() لا يطابق أبدًا أي id حقيقي من Firestore، فتظل تظهر
+        // كقيد انتظار حتى بعد اعتمادها فعليًا من هذا النظام أو من النظام الآخر عبر الجسر).
+        // استعلام Firestore أعلاه وحده كافٍ ومحدّث دائمًا.
       } else if (uType === 'admin') {
         // جلب الجداول النهائية
         const shiftSnap = await getDocs(query(collection(db, 'shifts'), where('status', '==', 'pending_final')));
@@ -4596,8 +4809,9 @@ let USERS = {
         const reqSnapNoSup = await getDocs(query(collection(db, 'requests'), where('status', '==', 'pending_supervisor')));
         const orphanReqs = reqSnapNoSup.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.supervisorName);
         requests = [...requests, ...orphanReqs];
-        const fbReqIds = new Set(requests.map(r => String(r.id)));
-        allRequests.filter(r => ['pending_supervisor','pending_final'].includes(r.status) && !r.supervisorName && !fbReqIds.has(String(r.id))).forEach(r => requests.push(r));
+        // ملحوظة: تم إلغاء الدمج من allRequests هنا لنفس السبب أعلاه — id وهمي بـ Date.now()
+        // كان بيسبب ظهور "صورة" شبح للطلب في قائمة قيد الموافقة حتى بعد اعتماده فعليًا
+        // (سواء اعتماد محلي أو عبر الجسر من نظام الموارد البشرية). استعلام Firestore أعلاه كافٍ.
         // دمج الطلبات الواردة من نظام الموارد البشرية عبر الجسر المشترك (تظهر للأدمن مباشرة)
         const remoteReqs = await window.fetchRemoteSharedRequests(['pending','pending_supervisor','pending_final']);
         requests = requests.concat(remoteReqs);
@@ -4920,6 +5134,7 @@ let USERS = {
       { icon:'📄', title:'الصفحات', sub:'منح/سحب صلاحيات صفحات فعلية لكل مستخدم', fn:'renderPagesPermissions', colors:['#00695c','#00897b'] },
       { icon:'🧾', title:'سجل إجراءات الأدمن', sub:'كل إجراء فعلي مسجَّل بمعرفة الأدمن الذي نفَّذه', fn:'showAdminAuditLog', colors:['#4e342e','#6d4c41'] },
       { icon:'📊', title:'الإحصاء الطبي والحوكمة', sub:'دفتر النوبتجيات والاستعلام عنها', fn:'renderStatsGovernanceHub', colors:['#1b5e20','#2e7d32'] },
+      { icon:'🆕', title:'موظفين جدد من الموارد البشرية', sub:'مراجعة واستيراد الموظفين المضافين في نظام الموارد البشرية', fn:'renderNewStaffCandidatesFromHR', colors:['#6d4c00','#a97400'] },
     ];
     showModal(`
       <div class="section-header">
@@ -7095,7 +7310,7 @@ ${body}
       { icon:'😴', title:'استعلام عن بدل راحة', sub:'كل طلبات بدل الراحة', fn:"renderGenericInquiry(['بدل راحة'], '😴 استعلام عن بدل راحة', false)", colors:['#6d597a','#8d6ea0'] },
       { icon:'🧳', title:'استعلام عن المأموريات وخطوط السير', sub:'كل طلبات المأموريات وخطوط السير', fn:"renderGenericInquiry(['مأمورية'], '🧳 استعلام عن المأموريات وخطوط السير', false)", colors:['#e67e22','#f39c12'] },
       { icon:'🔄', title:'استعلام عن مبادلة نوبتجية', sub:'كل طلبات المبادلة', fn:"renderGenericInquiry(['مبادلة'], '🔄 استعلام عن مبادلة نوبتجية', false)", colors:['#e6b800','#cc9900'] },
-      { icon:'🔍', title:'استعلامات أخرى', sub:'أي طلب لا يندرج تحت الأنواع السابقة', fn:"renderGenericInquiry(['طلب آخر'], '🔍 استعلامات أخرى', false)", colors:['#607d8b','#78909c'] },
+      { icon:'📋', title:'استعلامات عامة', sub:'كل أنواع الإجراءات لموظف واحد', fn:"window.renderGeneralInquiryAll()", colors:['#607d8b','#78909c'] },
     ];
     showModal(`
       <div class="section-header"><h2>🔍 الاستعلام عن إجراء / طلب / إجازة / مأمورية</h2></div>
@@ -7117,6 +7332,8 @@ ${body}
   };
 
   // دالة استعلام عامة (تُستخدم لكل أنواع الطلبات): تبحث باسم الموظف وتُظهر السجلات المطابقة + عدد المنفذة (المعتمدة)
+  // ✅ إصلاح: بحث حي بمطابقة جزئية بمجرد كتابة حرفين (oninput) بدل مطابقة تامة + زرار بحث فقط —
+  // نفس منطق "استعلامات عامة" والموارد البشرية.
   window._giKeywords = [];
   window._giShowCount = false;
   window.renderGenericInquiry = function(keywords, title, showCount) {
@@ -7124,27 +7341,29 @@ ${body}
     window._giShowCount = !!showCount;
     showModal(`
       <div class="section-header"><h2>${title}</h2><button class="back-btn" onclick="renderDutyInquiryHub()">🔙 رجوع</button></div>
-      <div style="max-width:600px;margin:0 auto 20px;display:flex;gap:10px">
-        <input id="li_name" placeholder="اكتب اسم الموظف" style="flex:1;padding:12px;border:2px solid #1a1a2e;border-radius:30px;font-family:inherit">
-        <button onclick="doGenericInquiry()" style="padding:12px 26px;background:#1a1a2e;color:#f5c518;border:none;border-radius:30px;font-weight:900;cursor:pointer">بحث</button>
+      <div style="max-width:600px;margin:0 auto 20px;">
+        <input id="li_name" placeholder="اكتب اسم الموظف..." style="width:100%;padding:12px;border:2px solid #1a1a2e;border-radius:30px;font-family:inherit" oninput="doGenericInquiry(this.value)">
       </div>
-      <div id="li_result"></div>
+      <div id="li_result"><div style="text-align:center;color:#999;font-weight:700;padding:20px;">اكتب اسم الموظف لعرض النتائج</div></div>
     `);
     setTimeout(() => {
       const inp = document.getElementById('li_name');
-      if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') doGenericInquiry(); });
+      if (inp) inp.focus();
     }, 100);
   };
 
-  window.doGenericInquiry = async function() {
-    const term = (document.getElementById('li_name').value || '').trim();
+  window.doGenericInquiry = async function(term) {
+    term = window._giaNormalizeName(term || '');
     const resEl = document.getElementById('li_result');
-    if (!term) { resEl.innerHTML = ''; return; }
+    if (!resEl) return;
+    if (!term) { resEl.innerHTML = '<div style="text-align:center;color:#999;font-weight:700;padding:20px;">اكتب اسم الموظف لعرض النتائج</div>'; return; }
     resEl.innerHTML = '<div style="text-align:center;color:#999;font-weight:700">⏳ جاري البحث...</div>';
     try {
-      const snap = await getDocs(query(collection(db, 'requests'), where('username', '==', term)));
+      const snap = await getDocs(collection(db, 'requests'));
       const kws = window._giKeywords || [];
-      const items = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(r => kws.some(kw => (r.type||'').includes(kw)));
+      const items = snap.docs.map(d => ({id:d.id, ...d.data()}))
+        .filter(r => window._giaNormalizeName(r.username || '').includes(term))
+        .filter(r => kws.some(kw => (r.type||'').includes(kw)));
       if (!items.length) { resEl.innerHTML = '<div style="text-align:center;color:#999;font-weight:700">لا توجد سجلات مطابقة لهذا الاسم</div>'; return; }
       items.sort((a,b) => new Date(b.submittedAt||0) - new Date(a.submittedAt||0));
       const statusLabel = { approved:'✅ معتمدة', rejected:'❌ مرفوضة', pending_supervisor:'⏳ تنتظر رئيس القسم', pending_final:'⏳ تنتظر الاعتماد النهائي' };
@@ -7156,7 +7375,7 @@ ${body}
       resEl.innerHTML = countHtml + items.map(r => `
         <div style="background:#fff;border:2px solid #1a1a2e;border-radius:16px;padding:16px 20px;margin-bottom:12px">
           <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
-            <div style="font-weight:900">${r.type}</div>
+            <div style="font-weight:900">${r.type} — ${r.username||''}</div>
             <div style="font-weight:800;font-size:0.85rem">${statusLabel[r.status]||r.status||''}</div>
           </div>
           <div style="font-size:0.85rem;color:#555;margin-top:6px">${r.details||''}</div>
@@ -7164,6 +7383,96 @@ ${body}
         </div>`).join('');
     } catch(e) {
       resEl.innerHTML = '<div style="color:#c0392b;font-weight:800">❌ ' + e.message + '</div>';
+    }
+  };
+
+  // ==================== استعلامات عامة (نفس منطق نظام الموارد البشرية): بحث حي بمجرد كتابة حرفين — كل أنواع الإجراءات لموظف واحد ====================
+  window._giaNormalizeName = function(s) {
+    s = (s || '').toString();
+    s = s.replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي');
+    s = s.replace(/[^\u0621-\u064A0-9\s]/g, ' ');
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+  };
+
+  window.renderGeneralInquiryAll = function() {
+    showModal(`
+      <div class="section-header"><h2>📋 استعلامات عامة</h2><button class="back-btn" onclick="renderDutyInquiryHub()">🔙 رجوع</button></div>
+      <div style="max-width:600px;margin:0 auto 20px;">
+        <input id="gia_name" placeholder="اكتب اسم الموظف..." style="width:100%;padding:12px;border:2px solid #1a1a2e;border-radius:30px;font-family:inherit" oninput="window.runGeneralInquiryAll(this.value)">
+      </div>
+      <div id="gia_summary"></div>
+      <div id="gia_result"><div style="text-align:center;color:#999;font-weight:700;padding:20px;">اكتب اسم الموظف لعرض تحركاته</div></div>
+    `);
+    setTimeout(() => {
+      const inp = document.getElementById('gia_name');
+      if (inp) inp.focus();
+    }, 100);
+  };
+
+  window.runGeneralInquiryAll = async function(term) {
+    const listEl = document.getElementById('gia_result');
+    const sumEl = document.getElementById('gia_summary');
+    if (!listEl || !sumEl) return;
+    term = window._giaNormalizeName(term || '');
+    if (!term) { listEl.innerHTML = '<div style="text-align:center;color:#999;font-weight:700;padding:20px;">اكتب اسم الموظف لعرض تحركاته</div>'; sumEl.innerHTML = ''; return; }
+    listEl.innerHTML = '<div style="text-align:center;color:#999;font-weight:700;padding:20px;">⏳ جاري البحث...</div>';
+    sumEl.innerHTML = '';
+    try {
+      const snap = await getDocs(collection(db, 'requests'));
+      let items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      items = items.filter(r => window._giaNormalizeName(r.username || '').includes(term));
+      items.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+
+      if (!items.length) {
+        listEl.innerHTML = '<div style="text-align:center;color:#999;font-weight:700;padding:20px;">لا توجد نتائج لهذا الموظف</div>';
+        return;
+      }
+
+      const byType = {};
+      let doneTotal = 0, pendingTotal = 0, rejectedTotal = 0;
+      items.forEach(r => {
+        const t = r.type || '-';
+        byType[t] = byType[t] || { done: 0, pending: 0, rejected: 0 };
+        if (r.status === 'approved') { byType[t].done++; doneTotal++; }
+        else if (r.status === 'rejected') { byType[t].rejected++; rejectedTotal++; }
+        else { byType[t].pending++; pendingTotal++; }
+      });
+
+      sumEl.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;max-width:900px;margin:0 auto 20px;">
+          <div style="background:#f0fff4;border:2px solid #1a7d3a;border-radius:14px;padding:12px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:900;color:#1a7d3a;">${doneTotal}</div><div style="font-size:0.8rem;font-weight:700;color:#1a7d3a;">منفذة</div>
+          </div>
+          <div style="background:#fffbf0;border:2px solid #b7950b;border-radius:14px;padding:12px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:900;color:#b7950b;">${pendingTotal}</div><div style="font-size:0.8rem;font-weight:700;color:#b7950b;">قيد الانتظار</div>
+          </div>
+          <div style="background:#fff0f0;border:2px solid #c0392b;border-radius:14px;padding:12px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:900;color:#c0392b;">${rejectedTotal}</div><div style="font-size:0.8rem;font-weight:700;color:#c0392b;">مرفوضة</div>
+          </div>
+        </div>
+        <div style="max-width:900px;margin:0 auto 20px;background:#fff;border:2px solid #1a1a2e;border-radius:16px;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;text-align:center;font-size:0.85rem;">
+            <thead><tr style="background:#1a1a2e;color:#fff;"><th style="padding:8px;">النوع</th><th style="padding:8px;">منفذة</th><th style="padding:8px;">قيد الانتظار</th><th style="padding:8px;">مرفوضة</th></tr></thead>
+            <tbody>
+              ${Object.keys(byType).map(t => `<tr><td style="padding:8px;font-weight:800;">${t}</td><td style="padding:8px;color:#1a7d3a;font-weight:800;">${byType[t].done}</td><td style="padding:8px;color:#b7950b;font-weight:800;">${byType[t].pending}</td><td style="padding:8px;color:#c0392b;font-weight:800;">${byType[t].rejected}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      const statusLabel = { pending: '⏳ قيد الانتظار', pending_supervisor: '⏳ تنتظر رئيس القسم', pending_final: '⏳ تنتظر الاعتماد النهائي', approved: '✅ منفذ', rejected: '❌ مرفوض' };
+      listEl.innerHTML = items.map(r => `
+        <div style="background:#fff;border:2px solid #1a1a2e;border-radius:16px;padding:16px 20px;margin-bottom:12px;max-width:900px;margin-left:auto;margin-right:auto;">
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div style="font-weight:900;">${r.type || '-'} — ${r.username || ''}</div>
+            <div style="font-weight:800;font-size:0.85rem;">${statusLabel[r.status] || r.status || ''}</div>
+          </div>
+          <div style="font-size:0.85rem;color:#555;margin-top:6px;">${r.details || ''}</div>
+          <div style="font-size:0.75rem;color:#999;margin-top:4px;">تاريخ التقديم: ${r.submittedAt ? new Date(r.submittedAt).toLocaleString('ar-EG') : '-'}</div>
+        </div>`).join('');
+    } catch (e) {
+      listEl.innerHTML = '<div style="color:#c0392b;font-weight:800;text-align:center;">❌ ' + e.message + '</div>';
     }
   };
 
@@ -7574,6 +7883,9 @@ window.editEmpCard = function(idx) {
         }
       });
     } catch(e) { console.log('employees_custom load error:', e); }
+
+    // ── مطابقة محلية فورية لإجازات الموارد البشرية المعتمدة عند الدخول (بدون انتظار فتح شاشة الموافقات) ──
+    if (typeof window.loadHRApprovedLeaves === 'function') window.loadHRApprovedLeaves();
 
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('dashboard').style.display = 'flex';
@@ -8164,6 +8476,45 @@ window.editEmpCard = function(idx) {
 // ==================== جدول لجنة الإشراف والحوكمة وإدارة المستشفى (منقولة من سيستم1) ====================
   window.renderSupervisionCommittee = function(silent) {
     const isAdmin = ['admin','supermanager'].includes(currentUserData?.type);
+    // ربط أسماء الفرق بمعرفاتها — يُستخدم عند رفع مسودة الجدول كطلب في "طلبات قيد الموافقة"
+    const _SUPV_TEAM_TITLES = {
+      1: 'جدول مرور فريق الإشراف والمتابعة وإدارة المستشفى',
+      2: 'نوبتجيات المدير المناوب',
+      5: 'نوبتجيات النائب الإداري',
+      3: 'جدول إشراف ومرور الفرق واللجان الفنية بالمستشفى'
+    };
+
+    // ── ترقية مسودة جدول الإدارة الإشرافية إلى "معتمد" — تُستدعى من زرار الاعتماد الداخلي
+    //    وأيضًا من شاشة "طلبات قيد الموافقة" الموحّدة (سواء اعتمدها الأدمن من هذا النظام أو من الموارد البشرية) ──
+    window._supv_promoteDraftToApproved = async function(draftDocId, teamId) {
+      try {
+        const draftSnap = await getDoc(doc(db, 'supervision_schedules', draftDocId));
+        if (!draftSnap.exists()) return { ok: false, reason: 'draft-not-found' };
+        const d = draftSnap.data();
+        const rows = d.rows || [];
+        const firstRow = rows[0] || {};
+        const ts = (typeof serverTimestamp === 'function') ? serverTimestamp() : new Date().toISOString();
+        const stableId = `team${teamId}_${firstRow.shift||'day'}_${(firstRow.date||'').replace(/-/g,'')}`;
+        await setDoc(doc(db, 'supervision_schedules', stableId), {
+          teamId: teamId,
+          rows: rows,
+          submittedBy: d.savedBy || window.currentUser || '—',
+          submittedAt: ts,
+          status: 'approved'
+        });
+        await deleteDoc(doc(db, 'supervision_schedules', draftDocId));
+        return { ok: true };
+      } catch (e) {
+        console.log('تعذر ترقية مسودة الإدارة الإشرافية:', e);
+        return { ok: false, reason: String(e && e.message || e) };
+      }
+    };
+
+    // ── تجاهل/حذف مسودة جدول الإدارة الإشرافية عند رفض الطلب من شاشة "طلبات قيد الموافقة" ──
+    window._supv_discardDraft = async function(draftDocId) {
+      try { await deleteDoc(doc(db, 'supervision_schedules', draftDocId)); }
+      catch (e) { console.log('تعذر حذف مسودة الإدارة الإشرافية المرفوضة:', e); }
+    };
 
     // بيانات الأعضاء
     const TEAM1 = [
@@ -8467,7 +8818,7 @@ window.editEmpCard = function(idx) {
         showToast('✅ تمت الإضافة');
       };
 
-      // ─── حفظ مسودة (متاح للجميع) ───
+      // ─── حفظ مسودة (متاح للجميع) — وتسجيلها كطلب في "طلبات قيد الموافقة" + الجسر المشترك بين النظامين ───
       window[`_sv_save_${teamId}`] = async function() {
         const rows = window[`_sv_rows_${teamId}`];
         if (!rows.length) { showToast('⚠️ الجدول فارغ - أضف بيانات أولاً'); return; }
@@ -8484,14 +8835,47 @@ window.editEmpCard = function(idx) {
           const ts = (typeof serverTimestamp === 'function') ? serverTimestamp() : new Date().toISOString();
           const firstRowD = cleanRows[0];
           const stableDraftId = `team${teamId}_draft_${firstRowD.shift||'day'}_${(firstRowD.date||'').replace(/-/g,'')}`;
+
+          // ── تسجيل الطلب في شاشة "طلبات قيد الموافقة" الموحّدة + الشيت المشترك (يظهر في استعلام حوكمة الطلبات بالنظامين) ──
+          const teamTitle = _SUPV_TEAM_TITLES[teamId] || 'جدول الإدارة الإشرافية';
+          const shiftLabel = firstRowD.shift === 'night' ? '🌙 سهر' : '🌅 نوبتجية';
+          const sharedId = (typeof window._genSharedId === 'function') ? window._genSharedId() : ('req_' + Date.now());
+          const newRequest = {
+            id: 'supv_' + Date.now(),
+            type: '🏛️ ' + teamTitle,
+            username: window.currentUser || '—',
+            requestedBy: window.currentUser || '—',
+            dept: '',
+            date: firstRowD.date || '',
+            details: `${shiftLabel} — ${firstRowD.day || ''} — ${cleanRows.length} اسم بالجدول`,
+            status: 'pending_final',
+            submittedAt: new Date().toISOString(),
+            sharedId: sharedId,
+            supervisionDraftId: stableDraftId,
+            supervisionTeamId: teamId
+          };
+
+          let requestDocId = null;
+          try {
+            const savedReqRef = await addDoc(collection(db, 'requests'), { ...newRequest, submittedAt: serverTimestamp() });
+            requestDocId = savedReqRef.id;
+            if (typeof window.pushSharedRequest === 'function') window.pushSharedRequest(requestDocId, newRequest);
+            if (typeof window.logGovernanceEntryPending === 'function') window.logGovernanceEntryPending(newRequest);
+            if (typeof allRequests !== 'undefined' && Array.isArray(allRequests)) allRequests.push({ ...newRequest, id: requestDocId });
+          } catch (reqErr) {
+            console.log('تعذر تسجيل مسودة الإدارة الإشرافية كطلب قيد الموافقة:', reqErr);
+          }
+
           await setDoc(doc(db, 'supervision_schedules', stableDraftId), {
             teamId: teamId,
             rows: cleanRows,
             savedBy: window.currentUser || '—',
             savedAt: ts,
-            status: 'draft'
+            status: 'draft',
+            requestDocId: requestDocId,
+            sharedId: sharedId
           });
-          showToast('💾 تم حفظ الجدول كمسودة بنجاح');
+          showToast('💾 تم حفظ الجدول، وأُرسل لشاشة "طلبات قيد الموافقة" لاعتماده');
           window[`_sv_loadSaved_${teamId}`]();
         } catch(e) {
           showToast('⚠️ خطأ في الحفظ: ' + e.message);
@@ -8533,7 +8917,8 @@ window.editEmpCard = function(idx) {
         }
       };
 
-      // ─── اعتماد مسودة موجودة (للأدمن فقط) — تنقلها من "مسودة" إلى "معتمد" فتظهر في الدفتر ───
+      // ─── اعتماد مسودة موجودة (للأدمن فقط) — تنقلها من "مسودة" إلى "معتمد" فتظهر في الدفتر،
+      //     وتُنظّف الطلب المرتبط بها من شاشة "طلبات قيد الموافقة" + الشيت المشترك حتى لا يظل عالقًا ───
       window[`_sv_approveDraft_${teamId}`] = async function(draftDocId) {
         if (!isAdmin) { showToast('⚠️ الاعتماد متاح للأدمن فقط'); return; }
         if (!confirm('هل تريد اعتماد هذه المسودة وإرسالها لدفتر المرور؟')) return;
@@ -8541,18 +8926,14 @@ window.editEmpCard = function(idx) {
           const draftSnap = await getDoc(doc(db, 'supervision_schedules', draftDocId));
           if (!draftSnap.exists()) { showToast('⚠️ تعذر العثور على المسودة'); return; }
           const d = draftSnap.data();
-          const rows = d.rows || [];
-          const firstRow = rows[0] || {};
-          const ts = (typeof serverTimestamp === 'function') ? serverTimestamp() : new Date().toISOString();
-          const stableId = `team${teamId}_${firstRow.shift||'day'}_${(firstRow.date||'').replace(/-/g,'')}`;
-          await setDoc(doc(db, 'supervision_schedules', stableId), {
-            teamId: teamId,
-            rows: rows,
-            submittedBy: window.currentUser || '—',
-            submittedAt: ts,
-            status: 'approved'
-          });
-          await deleteDoc(doc(db, 'supervision_schedules', draftDocId));
+          const linkedRequestDocId = d.requestDocId || null;
+          const linkedSharedId = d.sharedId || null;
+          const result = await window._supv_promoteDraftToApproved(draftDocId, teamId);
+          if (!result.ok) { showToast('⚠️ تعذر الاعتماد: ' + (result.reason || '')); return; }
+          if (linkedRequestDocId) {
+            try { await updateDoc(doc(db, 'requests', linkedRequestDocId), { status: 'approved', finalApprovedBy: currentUser, finalApprovedAt: serverTimestamp() }); } catch(e) {}
+          }
+          if (linkedSharedId && typeof window.syncSharedRequestStatus === 'function') window.syncSharedRequestStatus(linkedSharedId, 'approved', currentUser);
           showToast('✅ تم اعتماد الجدول وإرساله لدفتر المرور بنجاح');
           window[`_sv_loadSaved_${teamId}`]();
         } catch(e) {

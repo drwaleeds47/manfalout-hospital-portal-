@@ -2,12 +2,10 @@ name = "manfalout-secure-gateway"
 main = "worker.js"
 compatibility_date = "2026-01-01"
 
-# يخدم كل ملفات الـ HTML اللي في جذر الريبو (index.html والباقي) كملفات static
 [assets]
-directory = "./"
+directory = "./assets"
 binding = "ASSETS"
 
-# نفس ربط قاعدة البيانات اللي شغالة دلوقتي على الـ Worker
 [[d1_databases]]
 binding = "DB"
 database_name = "manfalout-portal-db"

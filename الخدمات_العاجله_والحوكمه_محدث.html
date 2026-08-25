@@ -5586,27 +5586,59 @@ window.openDriveFile = function(url, title, backFnName) {
     ? `<div style="text-align:center;margin-top:10px;font-size:0.82rem;color:#27ae60;font-weight:700;">✅ ${label} — يعرض مهما كان الحجم بدون مشاكل</div>`
     : `<div style="text-align:center;margin-top:10px;font-size:0.82rem;color:#888;font-weight:700;">💡 لو ظهر "الملف كبير" اضغط <strong>🔗 فتح خارجي</strong></div>`;
 
+  const fullscreenBtn = `<button id="fsBtn_${id}" onclick="toggleViewerFullscreen('${id}')" class="btn-gold" style="border:none;cursor:pointer;font-size:0.82rem;background:#1565c0;">⛶ ملء الشاشة</button>`;
+
   showModal(`
     <div class="section-header">
       <h2>${icon} ${title||'عرض الملف'} <span style="font-size:0.7rem;background:rgba(0,0,0,0.08);padding:2px 8px;border-radius:20px;color:#555;">${label}</span></h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         ${viewerControls}
+        ${fullscreenBtn}
         <a href="${openUrl}" target="_blank" class="btn-gold" style="text-decoration:none;display:inline-block;font-size:0.82rem;background:#8e44ad;">🔗 فتح خارجي</a>
         <button class="back-btn" onclick="${closeAction}">${closeLabel}</button>
       </div>
     </div>
-    <div id="driveViewerWrap_${id}" style="border-radius:15px;overflow:hidden;border:2px solid var(--primary-dark);">
+    ${isDocs ? `<div style="text-align:center;margin-bottom:8px;font-size:0.78rem;color:#8e44ad;font-weight:700;">↕️↔️ لو الشيت كبير: مرّر داخل الجدول نفسه للتنقل، أو اضغط "⛶ ملء الشاشة" لعرض أوضح وأكبر</div>` : ''}
+    ${type === 'sheets' ? `
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px;">
+      <button onclick="sheetScrollWrap('${id}',-1)" style="background:#6a0dad;color:#fff;border:none;border-radius:50%;width:38px;height:38px;font-size:1.1rem;font-weight:900;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.25);">◄</button>
+      <div style="font-size:0.78rem;color:#8e44ad;font-weight:700;">مرّر يمينًا ويسارًا لرؤية باقي الأعمدة</div>
+      <button onclick="sheetScrollWrap('${id}',1)" style="background:#6a0dad;color:#fff;border:none;border-radius:50%;width:38px;height:38px;font-size:1.1rem;font-weight:900;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.25);">►</button>
+    </div>` : ''}
+    <div id="driveViewerWrap_${id}" style="border-radius:15px;${type === 'sheets' ? 'overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;' : 'overflow:hidden;'}border:2px solid var(--primary-dark);">
       <iframe
         id="driveIframe_${id}"
         src="${embedUrl}"
-        width="100%" height="650" frameborder="0"
-        style="display:block;"
+        width="${type === 'sheets' ? '1600' : '100%'}" height="${isDocs ? '75vh' : '650'}" frameborder="0"
+        style="display:block;min-height:${isDocs ? '480px' : '650px'};${type === 'sheets' ? 'width:1600px;max-width:none;' : ''}"
         onload="checkIframeContent('${id}', '${downloadUrl}')"
       ></iframe>
     </div>
     ${hint}
   `);
 };
+
+// تحريك عارض الإكسيل (Google Sheets) يمينًا/يسارًا بالأزرار بدل الاعتماد على شريط تمرير رفيع صعب الإمساك به على الموبايل
+window.sheetScrollWrap = function(id, dir) {
+  const wrap = document.getElementById('driveViewerWrap_' + id);
+  if (!wrap) return;
+  const step = Math.round(wrap.clientWidth * 0.7) || 300;
+  wrap.scrollBy({ left: dir * step, behavior: 'smooth' });
+};
+
+window.toggleViewerFullscreen = function(id) {
+  const wrap = document.getElementById('driveViewerWrap_' + id);
+  if (!wrap) return;
+  if (!document.fullscreenElement) {
+    (wrap.requestFullscreen || wrap.webkitRequestFullscreen || wrap.msRequestFullscreen || function(){}).call(wrap);
+    wrap.style.background = '#fff';
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen || function(){}).call(document);
+  }
+};
+document.addEventListener('fullscreenchange', function() {
+  document.querySelectorAll('[id^="driveViewerWrap_"] iframe').forEach(f => { f.style.height = document.fullscreenElement ? '100vh' : ''; });
+});
 
 window.switchViewer = function(mode, id) {
   const iframe = document.getElementById('driveIframe_' + id);
@@ -8593,6 +8625,10 @@ ${body}
             { name:'الأذونات التي تم تسويتها — اقتصادي مستلزمات', url:'https://drive.google.com/file/d/1_0NX8i7AivbqE4ssbtshwoyuFibkgZPw/view?usp=drivesdk' },
             { name:'شيت المطابقة — ملف مستلزمات شهر يناير نفقة', url:'https://drive.google.com/file/d/1QPURECUcI-ZuRWs6w2akWPyqs4LI2Vbu/view?usp=drivesdk' },
           ],
+          'تسوية 4': [
+            { name:'تسويات 7', url:'https://drive.google.com/file/d/168G_BaWzuWl0FQjkTd8wKaqjPlmC92bJ/view?usp=drive_link' },
+            { name:'شيت المطابقة', url:'https://drive.google.com/file/d/1KlwjLeBHDqTAyZq1USeMCS-2wlE2qr4V/view?usp=drive_link' },
+          ],
         },
       },
       authority: {
@@ -8617,6 +8653,17 @@ ${body}
       { fund:'اقتصادي',   type:'مستلزمات',   name:'مستلزمات اقتصادي',  deliveredToFinance:true,  url:'https://drive.google.com/file/d/1YB8iHHABbKzEnbn6idXe-4xyxMmurWld/view?usp=drivesdk' },
       { fund:'اقتصادي',   type:'أدوية',      name:'أدوية اقتصادي',     deliveredToFinance:true,  url:'https://drive.google.com/file/d/1FwY4dXX1OyNG6502E7uOEY-Gre8x88rz/view?usp=drivesdk' },
     ],
+    // شيتات "جاهز للتسليم للماليات" — شيتات جوجل حية مباشرة، مقسّمة أدوية/مستلزمات ثم اقتصادي وتأمين صحي / نفقة دولة
+    unpaidReady: {
+      medicines: [
+        { name:'اقتصادي وتأمين صحي', url:'https://docs.google.com/spreadsheets/d/15Ni7EYMlAhXrSr75K6F2ATR5YiLZtikV/edit?usp=sharing&ouid=103067479340333467581&rtpof=true&sd=true' },
+        { name:'نفقة دولة', url:'https://docs.google.com/spreadsheets/d/1wWBqC7lY3r0JVWzBZu8kIC0vfXCo-FWw/edit?usp=sharing&ouid=103067479340333467581&rtpof=true&sd=true' },
+      ],
+      supplies: [
+        { name:'اقتصادي وتأمين صحي', url:'https://docs.google.com/spreadsheets/d/1Jl3k3c5mr2O8DYGo_Y4te2So0fBguER8/edit?usp=sharing&ouid=103067479340333467581&rtpof=true&sd=true' },
+        { name:'نفقة دولة', url:'https://docs.google.com/spreadsheets/d/1MVCjDYr-lnEWaP0IQbtXDyck1jNTp6EW/edit?usp=sharing&ouid=103067479340333467581&rtpof=true&sd=true' },
+      ],
+    },
   };
   window.PROCUREMENT_DATA = PROCUREMENT_DATA;
 
@@ -8677,19 +8724,25 @@ ${body}
             </select>
           </div>
         </div>
-        <button onclick="window._submitUnpaidSheet()" style="width:100%;background:linear-gradient(135deg,#1a1a2e,#2d2d44);color:#f0dc82;border:2px solid #f0dc82;border-radius:40px;padding:12px 30px;font-weight:900;cursor:pointer;font-family:inherit">
+        <button id="aus_submitBtn" onclick="window._submitUnpaidSheet()" style="width:100%;background:linear-gradient(135deg,#1a1a2e,#2d2d44);color:#f0dc82;border:2px solid #f0dc82;border-radius:40px;padding:12px 30px;font-weight:900;cursor:pointer;font-family:inherit">
           ✅ إرسال
         </button>
       </div>
     `);
   };
+  // حارس يمنع الإضافة المتكررة (2-3 مرات) لو المستخدم ضغط "إرسال" أكتر من مرة قبل ما يستجيب النظام
+  window._submitUnpaidSheetInFlight = false;
   window._submitUnpaidSheet = async function() {
+    if (window._submitUnpaidSheetInFlight) return; // منع أي ضغطة إضافية أثناء تنفيذ الإرسال
     const name = (document.getElementById('aus_name').value || '').trim();
     const url = (document.getElementById('aus_url').value || '').trim();
     const fund = document.getElementById('aus_fund').value;
     const type = document.getElementById('aus_type').value;
     if (!name || !url) { showToast('⚠️ من فضلك اكتب اسم الشيت والرابط'); return; }
     const newItem = { fund, type, name, url };
+    window._submitUnpaidSheetInFlight = true;
+    const btn = document.getElementById('aus_submitBtn');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; btn.textContent = '⏳ جاري الإضافة...'; }
     try {
       await addDoc(collection(db, UNPAID_EXTRA_COLLECTION), newItem);
       // مفيش داعي نضيفه يدويًا هنا — المستمع اللحظي (onSnapshot) هيستقبله ويحدّث الشاشة تلقائيًا خلال لحظات
@@ -8699,6 +8752,8 @@ ${body}
       PROCUREMENT_DATA.unpaid.push({ ...newItem, deliveredToFinance:false });
       showToast('⚠️ تمت الإضافة محليًا فقط — تحقق من الاتصال بالإنترنت');
       renderProcUnpaidCategory(false);
+    } finally {
+      window._submitUnpaidSheetInFlight = false;
     }
   };
 
@@ -8748,7 +8803,7 @@ ${body}
         ${procBigCard('📦','جرد إلكتروني','لجان الجرد - أعمال الجرد','#2d6a4f','renderProcInventory()')}
         ${procBigCard('⚖️','قوانين وتدريبات','قوانين الهيئة - تدريبات','#6a0dad','renderProcLaws()')}
         ${procBigCard('✅','ما تم سداده','سدد بأمر دفع - سدد بتسويات الهيئة - مصادقة هيئة الشراء الموحد','#b8860b','renderProcPaid()')}
-        ${procBigCard('❌','ما لم يسدد','تم التسليم لقسم الماليات - لم يتم التسليم للماليات','#c0392b','renderProcUnpaid()')}
+        ${procBigCard('❌','ما لم يسدد','تم التسليم لقسم الماليات - أذونات وفواتير حديثة من 1-7-2026','#c0392b','renderProcUnpaid()')}
       </div>
     `);
   };
@@ -8897,14 +8952,35 @@ ${body}
       <div class="section-header"><h2>❌ ما لم يسدد</h2><button class="back-btn" onclick="renderProcurementHub()">◄ رجوع</button></div>
       <div class="sub-grid">
         ${procBigCard('📬','تم التسليم لقسم الماليات', `${deliveredCount} شيتات`, '#2d6a4f','renderProcUnpaidCategory(true)')}
-        ${procBigCard('📭','لم يتم التسليم للماليات', `${notDeliveredCount} شيتات — أدوية ومستلزمات`, '#c0392b','renderProcUnpaidCategory(false)')}
+        ${procBigCard('📭','أذونات وفواتير حديثة من 1-7-2026', `${notDeliveredCount} شيتات — لم يتم التسليم للماليات`, '#c0392b','renderProcUnpaidCategory(false)')}
+        ${procBigCard('🟡','جاهز للتسليم للماليات','أدوية - مستلزمات','#b8860b','renderProcUnpaidReady()')}
       </div>
+    `);
+  };
+
+  // -- 5.x جاهز للتسليم للماليات (أدوية / مستلزمات ← اقتصادي وتأمين صحي / نفقة دولة) --
+  window.renderProcUnpaidReady = function() {
+    showModal(`
+      <div class="section-header"><h2>🟡 جاهز للتسليم للماليات</h2><button class="back-btn" onclick="renderProcUnpaid()">◄ رجوع</button></div>
+      <div class="sub-grid">
+        ${procBigCard('💊','أدوية', `${PROCUREMENT_DATA.unpaidReady.medicines.length} شيتات`, '#2d9d5f',"renderProcUnpaidReadyDetail('medicines')")}
+        ${procBigCard('🩹','مستلزمات', `${PROCUREMENT_DATA.unpaidReady.supplies.length} شيتات`, '#2196c9',"renderProcUnpaidReadyDetail('supplies')")}
+      </div>
+    `);
+  };
+  window.renderProcUnpaidReadyDetail = function(kind) {
+    const items = PROCUREMENT_DATA.unpaidReady[kind] || [];
+    const title = kind === 'medicines' ? '💊 أدوية — جاهز للتسليم للماليات' : '🩹 مستلزمات — جاهز للتسليم للماليات';
+    const cards = items.map((it,i) => procLinkCard(it.name, it.url, '', `renderProcUnpaidReadyDetail('${kind}')`, i)).join('');
+    showModal(`
+      <div class="section-header"><h2>${title}</h2><button class="back-btn" onclick="renderProcUnpaidReady()">◄ رجوع</button></div>
+      <div class="sub-grid">${cards}</div>
     `);
   };
   window.renderProcUnpaidCategory = function(delivered) {
     window._currentUnpaidView = delivered;
     const isAdmin = currentUserData.type === 'admin';
-    const title = delivered ? '📬 تم التسليم لقسم الماليات' : '📭 لم يتم التسليم للماليات';
+    const title = delivered ? '📬 تم التسليم لقسم الماليات' : '📭 أذونات وفواتير حديثة من 1-7-2026';
     const rows = PROCUREMENT_DATA.unpaid.filter(it => !!it.deliveredToFinance === delivered);
 
     function cardsFor(list) {
