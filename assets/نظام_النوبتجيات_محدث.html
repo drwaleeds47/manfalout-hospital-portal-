@@ -2482,6 +2482,15 @@ let USERS = {
           // إضافة ملاحظة المبادلة في الجدول بعد الموافقة
           if (allRequests[index].type === 'مبادلة نوبتجية' && allRequests[index].exchangeWith) {
             allRequests[index].notes = `✅ مبادلة معتمدة مع: ${allRequests[index].exchangeWith}`;
+            // ── تبديل الاسمين تلقائيًا داخل جدول النوبتجية المعتمد نفسه، حتى يظهر التعديل فورًا في دفاتر النوبتجيات ──
+            try {
+              const exchResult = await window._applyShiftExchangeSwap(allRequests[index]);
+              if (exchResult && exchResult.success) {
+                showToast(`🔄 تم تحديث جدول النوبتجية المعتمد تلقائيًا (${exchResult.count} جدول)`);
+              } else {
+                showToast('⚠️ تم اعتماد المبادلة، لكن لم يتم العثور على أي من الاسمين كنوبتجي في جدول معتمد لنفس اليوم — راجع الجدول يدويًا');
+              }
+            } catch(e) { console.log('shift exchange auto-swap error:', e); }
           }
           allUpdates.unshift({
             id: Date.now(),
@@ -5751,6 +5760,160 @@ let USERS = {
   window._invalidateBooksCache = function() {
     window._approvedShiftsCache.data = null;
     window._approvedHolidayShiftsCache.data = null;
+  };
+
+  // ==================== تبديل تلقائي للاسمين في جدول النوبتجية المعتمد عند اعتماد طلب "مبادلة نوبتجية" ====================
+  // بيدور على الجدول (أو الجداول) المعتمدة لنفس القسم اللي فيها اسم الموظف صاحب الطلب واسم زميله في نفس اليوم،
+  // وبيبدّل مكان الاسمين جوه بيانات الجدول نفسه (collection 'shifts')، عشان التعديل يظهر فورًا في دفاتر النوبتجيات
+  // بصفحة إدارة المستخدمين بدون تدخل يدوي.
+  //
+  // مفتاح المطابقة الأساسي هو (اليوم + الشهر/السنة + القسم) — مش الاسم بالحرف. الاسم بيتحقق منه بعد كده:
+  // أولًا تطابق حرفي كامل، ولو مفيش، تطابق "تقريبي" (اختلاف بسيط في الهمزة/التاء المربوطة/مسافة/خطأ إملائي بسيط)
+  // طالما اليوم والتاريخ والقسم مطابقين فعلاً. لو حصل تطابق تقريبي، بيتسجل ده في lastExchangeNote للمراجعة،
+  // وبيتم توحيد الاسمين في الجدول للصيغة الرسمية المسجلة في الطلب (تصحيح تلقائي بسيط).
+  function _normalizeNameForMatch(s) {
+    return String(s || '')
+      .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '') // إزالة التشكيل
+      .replace(/[إأآا]/g, 'ا')
+      .replace(/ى/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .replace(/ؤ/g, 'و')
+      .replace(/ئ/g, 'ي')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function _levenshteinDist(a, b) {
+    const m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+      }
+    }
+    return dp[m][n];
+  }
+  function _isCloseNameMatch(nameInTable, nameInRequest) {
+    const na = _normalizeNameForMatch(nameInTable);
+    const nb = _normalizeNameForMatch(nameInRequest);
+    if (!na || !nb) return false;
+    if (na === nb) return true;
+    const dist = _levenshteinDist(na, nb);
+    const maxLen = Math.max(na.length, nb.length);
+    const tolerance = Math.max(1, Math.floor(maxLen * 0.2)); // اختلاف بسيط مسموح به (~20% من الطول)
+    if (dist <= tolerance) return true;
+    // تطابق أول كلمتين (الاسم الأول + الثاني) كخط دفاع إضافي لو باقي الاسم مختلف بشكل ملحوظ
+    const wa = na.split(' ').filter(Boolean);
+    const wb = nb.split(' ').filter(Boolean);
+    if (wa.length >= 2 && wb.length >= 2 && wa[0] === wb[0] && wa[1] === wb[1]) return true;
+    return false;
+  }
+  window._applyShiftExchangeSwap = async function(request) {
+    try {
+      if (!request || !request.username || !request.exchangeWith || !request.dept || !request.date) {
+        return { success: false, count: 0 };
+      }
+      const parts = String(request.date).split('-'); // yyyy-mm-dd من حقل التاريخ
+      const reqYearNum = parseInt(parts[0], 10);
+      const reqMonthNum = parseInt(parts[1], 10);
+      const reqDay = parseInt(parts[2], 10);
+      if (isNaN(reqDay)) return { success: false, count: 0 };
+
+      const q = query(collection(db, 'shifts'), where('status', '==', 'approved'), where('category', '==', request.dept));
+      const snapshot = await getDocs(q);
+      let updatedCount = 0;
+
+      for (const docSnap of snapshot.docs) {
+        const shiftDoc = docSnap.data();
+
+        // لو الجدول شهري وله شهر/سنة محددين، لازم يطابقوا تاريخ طلب المبادلة قبل ما نبدّل فيه
+        if (shiftDoc.month !== undefined && shiftDoc.month !== null && shiftDoc.month !== '') {
+          const docMonth = parseInt(shiftDoc.month, 10);
+          if (!isNaN(docMonth) && !isNaN(reqMonthNum) && docMonth !== reqMonthNum) continue;
+        }
+        if (shiftDoc.year !== undefined && shiftDoc.year !== null && shiftDoc.year !== '') {
+          const docYear = parseInt(shiftDoc.year, 10);
+          if (!isNaN(docYear) && !isNaN(reqYearNum) && docYear !== reqYearNum) continue;
+        }
+        if (!Array.isArray(shiftDoc.data)) continue;
+
+        let userIdx = -1, partnerIdx = -1;
+        // تمريرة أولى: تطابق حرفي كامل للاسم
+        shiftDoc.data.forEach((row, i) => {
+          if (parseInt(row.day, 10) !== reqDay) return;
+          const staffName = String(row.staff || '').trim();
+          if (userIdx === -1 && staffName === String(request.username).trim()) userIdx = i;
+          if (partnerIdx === -1 && staffName === String(request.exchangeWith).trim()) partnerIdx = i;
+        });
+        // تمريرة ثانية: طالما اليوم/الشهر/السنة/القسم مطابقين فعلاً (هي شروط الاستعلام والفلتر أعلاه)،
+        // نسمح بتطابق تقريبي للاسم لو فيه اختلاف بسيط (همزة/تاء مربوطة/مسافة/خطأ إملائي)
+        let userFuzzy = false, partnerFuzzy = false;
+        if (userIdx === -1 || partnerIdx === -1) {
+          shiftDoc.data.forEach((row, i) => {
+            if (parseInt(row.day, 10) !== reqDay) return;
+            const staffName = String(row.staff || '').trim();
+            if (userIdx === -1 && _isCloseNameMatch(staffName, request.username)) { userIdx = i; userFuzzy = true; }
+            if (partnerIdx === -1 && _isCloseNameMatch(staffName, request.exchangeWith)) { partnerIdx = i; partnerFuzzy = true; }
+          });
+        }
+
+        // حالة التبديل الكامل: الاسمان موجودان معًا في نفس اليوم/الجدول → تبديل مكانيهما
+        if (userIdx !== -1 && partnerIdx !== -1) {
+          const newData = shiftDoc.data.map(r => ({ ...r }));
+          // التبديل + توحيد الاسمين للصيغة الرسمية المسجلة بالطلب (يصحح أي اختلاف بسيط كان موجود في الجدول)
+          newData[userIdx].staff = String(request.exchangeWith).trim();
+          newData[partnerIdx].staff = String(request.username).trim();
+          const fuzzyNote = (userFuzzy || partnerFuzzy) ? ' (⚠️ تم تصحيح اختلاف بسيط في الاسم أثناء المطابقة)' : '';
+          try {
+            await updateDoc(doc(db, 'shifts', docSnap.id), {
+              data: newData,
+              lastExchangeAt: serverTimestamp(),
+              lastExchangeNote: `🔄 تبديل تلقائي بين ${request.username} و${request.exchangeWith} بتاريخ ${request.date}${fuzzyNote}`
+            });
+            updatedCount++;
+          } catch(e) { console.log('shift exchange update error:', e); }
+        }
+        // حالة الإحلال/التغطية: صاحب الطلب مسجَّل نوبتجي في نفس اليوم، لكن الزميل (الطرف الآخر) غير مُدرَج
+        // كنوبتجي في نفس اليوم بنفس الجدول أصلًا → الزميل يحل محله فقط، بدون اشتراط وجوده كنوبتجي مسبقًا
+        else if (userIdx !== -1 && partnerIdx === -1) {
+          const newData = shiftDoc.data.map(r => ({ ...r }));
+          newData[userIdx].staff = String(request.exchangeWith).trim();
+          const fuzzyNote = userFuzzy ? ' (⚠️ تم تصحيح اختلاف بسيط في الاسم أثناء المطابقة)' : '';
+          try {
+            await updateDoc(doc(db, 'shifts', docSnap.id), {
+              data: newData,
+              lastExchangeAt: serverTimestamp(),
+              lastExchangeNote: `🔄 إحلال/تغطية تلقائي: ${request.exchangeWith} حلّ محل ${request.username} بتاريخ ${request.date}${fuzzyNote}`
+            });
+            updatedCount++;
+          } catch(e) { console.log('shift exchange update error:', e); }
+        }
+        // الحالة العكسية: الزميل مسجَّل نوبتجي في نفس اليوم، وصاحب الطلب غير مُدرَج فيه → صاحب الطلب يحل محل الزميل
+        else if (partnerIdx !== -1 && userIdx === -1) {
+          const newData = shiftDoc.data.map(r => ({ ...r }));
+          newData[partnerIdx].staff = String(request.username).trim();
+          const fuzzyNote = partnerFuzzy ? ' (⚠️ تم تصحيح اختلاف بسيط في الاسم أثناء المطابقة)' : '';
+          try {
+            await updateDoc(doc(db, 'shifts', docSnap.id), {
+              data: newData,
+              lastExchangeAt: serverTimestamp(),
+              lastExchangeNote: `🔄 إحلال/تغطية تلقائي: ${request.username} حلّ محل ${request.exchangeWith} بتاريخ ${request.date}${fuzzyNote}`
+            });
+            updatedCount++;
+          } catch(e) { console.log('shift exchange update error:', e); }
+        }
+      }
+
+      if (updatedCount > 0) window._invalidateBooksCache();
+      return { success: updatedCount > 0, count: updatedCount };
+    } catch(e) {
+      console.log('applyShiftExchangeSwap error:', e);
+      return { success: false, count: 0 };
+    }
   };
 
   window.renderShiftBook = async function(directKey) {
