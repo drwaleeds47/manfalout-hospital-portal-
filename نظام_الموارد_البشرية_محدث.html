@@ -649,7 +649,7 @@ select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(230
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, initializeFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getDatabase, ref, set, get, child, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -667,7 +667,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 // ملحوظة أمان: تم إلغاء تسجيل الدخول المجهول (signInAnonymously).
 // الآن كل مستخدم يحصل على جلسة Firebase Authentication حقيقية مرتبطة باسمه وكلمة مروره الفعلية عند تسجيل الدخول (انظر doLogin).
-const db = getFirestore(app);
+// experimentalAutoDetectLongPolling: يحل مشكلة "Backend didn't respond" و 404 على قناة Listen
+// اللي بتحصل على شبكات/بروكسي بيقفل اتصال WebChannel الافتراضي (شائعة في شبكات المستشفيات/المؤسسات)
+const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true, useFetchStreams: false });
 const rtdb = getDatabase(app);
 
 // ========== EMP ATTACHMENTS FIREBASE SYNC ==========
