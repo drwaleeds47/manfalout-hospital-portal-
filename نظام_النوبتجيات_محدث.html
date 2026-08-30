@@ -6364,9 +6364,33 @@ let USERS = {
           return 9;
         }
 
+        // ── قائمة الخطوط العربية المتاحة للطباعة ──
+        // ── قائمة الخطوط العربية المتاحة للطباعة ──
+        // g:true = خط ويب (Google Fonts) يتحمّل تلقائيًا من الإنترنت
+        // g:false = خط محلي مثبّت على جهازك (لازم يكون مثبت على أي جهاز هيطبع منه، وإلا هيرجع للخط الافتراضي)
+        const PRINT_FONTS = [
+          { v:'Cairo',              n:'كايرو (Cairo) — الافتراضي', g:true },
+          { v:'Tajawal',            n:'تجوال (Tajawal)', g:true },
+          { v:'Almarai',            n:'المراعي (Almarai)', g:true },
+          { v:'IBM Plex Sans Arabic', n:'آي بي إم بلكس (رسمي)', g:true },
+          { v:'Changa',             n:'شنغة (Changa) — عناوين عريضة', g:true },
+          { v:'Amiri',              n:'أميري (Amiri) — نسخي تقليدي', g:true },
+          { v:'Noto Kufi Arabic',   n:'نوتو كوفي (Noto Kufi)', g:true },
+          { v:'Lalezar',            n:'لاله زار (Lalezar) — عناوين', g:true },
+          { v:'DG Faseh',           n:'DG Faseh (خط جهازك)', g:false },
+          { v:'PT Bold Heading',    n:'PT Bold Heading (خط جهازك)', g:false },
+          { v:'Aldhabi',            n:'Aldhabi (خط جهازك)', g:false },
+          { v:'Arial Unicode MS',   n:'Arial Unicode MS (خط جهازك)', g:false },
+          { v:'Hacen Beirut Heading', n:'Hacen Beirut Heading (خط جهازك)', g:false },
+        ];
+        const PRINT_FONTS_URL = 'https://fonts.googleapis.com/css2?' + PRINT_FONTS.filter(f => f.g).map(f => 'family=' + f.v.replace(/ /g,'+') + ':wght@400;700;900').join('&') + '&display=swap';
+
         // ── بناء HTML الطباعة النظيف ──
-        function buildCleanHTML(divsList, fontSize) {
+        function buildCleanHTML(divsList, fontSize, fontFamily, fontColor, textAlign) {
           if (!divsList.length) return null;
+          fontFamily = fontFamily || 'Cairo';
+          fontColor  = fontColor  || '#1a1a2e';
+          textAlign  = textAlign  || 'right';
           const parts = divsList.map(d => {
             const clone = d.cloneNode(true);
             clone.querySelectorAll('.noprint').forEach(el => el.remove());
@@ -6381,13 +6405,14 @@ let USERS = {
           const LOGO = 'https://i.postimg.cc/7Z6Vb2DJ/swrt-watsab-btarykh-1447-03-24-fy-02-38-08-fc1d64cc.jpg';
           const body = parts.map((p, i) => i === 0 ? p : `<div style="break-before:page;page-break-before:always">${p}</div>`).join('');
           return `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="${PRINT_FONTS_URL}" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{direction:rtl;font-family:'Cairo',sans-serif;background:#fff;font-size:${fontSize}px}
+  html,body{direction:rtl;font-family:'${fontFamily}',sans-serif;background:#fff;font-size:${fontSize}px;color:${fontColor}}
   body{padding:10px 10px 40px}
   table{border-collapse:collapse;width:100%}
-  th,td{border:1px solid #555;padding:5px 6px;text-align:right;font-size:${fontSize}px}
+  th,td{border:1px solid #555;padding:5px 6px;text-align:${textAlign};font-size:${fontSize}px}
+  td{color:${fontColor}}
   th{background:#1a1a2e;color:#e6b800;font-weight:900}
   input,button{display:none!important}
   .noprint{display:none!important}
@@ -6416,11 +6441,27 @@ ${body}
 </body></html>`;
         }
 
+        // ── تغيير محاذاة الخط المختارة ──
+        window._spSetAlign = function(align, btn) {
+          const hidden = document.getElementById('sp_align');
+          if (hidden) hidden.value = align;
+          if (btn && btn.parentElement) {
+            Array.from(btn.parentElement.children).forEach(b => {
+              b.style.background = '#eee'; b.style.color = '#333';
+            });
+            btn.style.background = '#1a1a2e'; btn.style.color = '#fff';
+          }
+        };
+
         // ── فتح نافذة الطباعة ──
         window._spDoPrint = function(type) {
-          const fs   = parseInt(type === 'night' ? document.getElementById('sp_night_font')?.value : document.getElementById('sp_day_font')?.value) || 11;
+          const fontIdMap = { day:'sp_day_font', night:'sp_night_font', all:'sp_all_font' };
+          const fs = parseInt(document.getElementById(fontIdMap[type])?.value) || 11;
+          const fontFamily = document.getElementById('sp_font_family')?.value || 'Cairo';
+          const fontColor  = document.getElementById('sp_font_color')?.value  || '#1a1a2e';
+          const textAlign  = document.getElementById('sp_align')?.value      || 'right';
           const divs = type === 'day' ? dayDivs : type === 'night' ? nightDivs : allDivs;
-          const html = buildCleanHTML(divs, fs);
+          const html = buildCleanHTML(divs, fs, fontFamily, fontColor, textAlign);
           if (!html) { showToast('⚠️ لا توجد بيانات لهذا النوع'); return; }
           const w = window.open('','_blank');
           w.document.write(html);
@@ -6438,6 +6479,36 @@ ${body}
               <button onclick="document.getElementById('smartPrintOverlay').remove()" style="background:#eee;border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:1rem;font-weight:900;line-height:1">✕</button>
             </div>
 
+            <div style="background:#f5f5f7;border:2px solid #999;border-radius:14px;padding:15px;margin-bottom:14px">
+              <div style="font-weight:900;color:#333;margin-bottom:10px;font-size:0.88rem">🎨 شكل الخط (يُطبَّق على أي جدول تختار طباعته)</div>
+              <div style="margin-bottom:10px">
+                <label style="font-size:0.8rem;font-weight:800;display:block;margin-bottom:4px">🔤 نوع الخط:</label>
+                <select id="sp_font_family" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid #bbb;font-family:inherit;font-size:0.85rem">
+                  <optgroup label="🌐 خطوط ويب (تتحمّل تلقائيًا)">
+                    ${PRINT_FONTS.filter(f => f.g).map(f => `<option value="${f.v}">${f.n}</option>`).join('')}
+                  </optgroup>
+                  <optgroup label="💻 خطوط جهازك (لازم تكون مثبتة على جهاز الطباعة)">
+                    ${PRINT_FONTS.filter(f => !f.g).map(f => `<option value="${f.v}">${f.n}</option>`).join('')}
+                  </optgroup>
+                </select>
+              </div>
+              <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <label style="font-size:0.8rem;font-weight:800">🖍️ لون الخط:</label>
+                  <input id="sp_font_color" type="color" value="#1a1a2e" style="width:38px;height:30px;border:1.5px solid #bbb;border-radius:6px;cursor:pointer;padding:0">
+                </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <label style="font-size:0.8rem;font-weight:800">📐 محاذاة الخط:</label>
+                  <input type="hidden" id="sp_align" value="right">
+                  <div style="display:flex;border:1.5px solid #bbb;border-radius:8px;overflow:hidden">
+                    <button type="button" data-align="right"  onclick="window._spSetAlign('right',this)"  style="padding:6px 12px;border:none;background:#1a1a2e;color:#fff;cursor:pointer;font-weight:800;font-size:0.8rem">يمين ▶</button>
+                    <button type="button" data-align="center" onclick="window._spSetAlign('center',this)" style="padding:6px 12px;border:none;background:#eee;color:#333;cursor:pointer;font-weight:800;font-size:0.8rem;border-right:1.5px solid #bbb;border-left:1.5px solid #bbb">⬛ توسيط</button>
+                    <button type="button" data-align="left"   onclick="window._spSetAlign('left',this)"   style="padding:6px 12px;border:none;background:#eee;color:#333;cursor:pointer;font-weight:800;font-size:0.8rem">◀ يسار</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div style="background:#e8f4fd;border:2px solid #0077b6;border-radius:14px;padding:15px;margin-bottom:12px">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                 <span style="font-weight:900;color:#0077b6">🌅 النوبتجية (8ص-8م)</span>
@@ -6445,7 +6516,7 @@ ${body}
               </div>
               <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
                 <label style="font-size:0.82rem;font-weight:800;white-space:nowrap">📝 حجم الخط:</label>
-                <input id="sp_day_font" type="range" min="7" max="16" value="${suggestFont(dayRows)}" step="1" style="flex:1;accent-color:#0077b6" oninput="document.getElementById('sp_day_fv').textContent=this.value+'px'">
+                <input id="sp_day_font" type="range" min="7" max="28" value="${suggestFont(dayRows)}" step="1" style="flex:1;accent-color:#0077b6" oninput="document.getElementById('sp_day_fv').textContent=this.value+'px'">
                 <span id="sp_day_fv" style="font-weight:900;color:#0077b6;min-width:34px;text-align:center">${suggestFont(dayRows)}px</span>
               </div>
               <button onclick="window._spDoPrint('day')" style="width:100%;padding:9px;background:#0077b6;color:white;border:none;border-radius:25px;font-family:inherit;font-weight:900;cursor:pointer;font-size:0.9rem">🖨️ فتح صفحة طباعة النوبتجية</button>
@@ -6458,7 +6529,7 @@ ${body}
               </div>
               <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
                 <label style="font-size:0.82rem;font-weight:800;white-space:nowrap">📝 حجم الخط:</label>
-                <input id="sp_night_font" type="range" min="7" max="16" value="${suggestFont(nightRows)}" step="1" style="flex:1;accent-color:#6a0572" oninput="document.getElementById('sp_night_fv').textContent=this.value+'px'">
+                <input id="sp_night_font" type="range" min="7" max="28" value="${suggestFont(nightRows)}" step="1" style="flex:1;accent-color:#6a0572" oninput="document.getElementById('sp_night_fv').textContent=this.value+'px'">
                 <span id="sp_night_fv" style="font-weight:900;color:#6a0572;min-width:34px;text-align:center">${suggestFont(nightRows)}px</span>
               </div>
               <button onclick="window._spDoPrint('night')" style="width:100%;padding:9px;background:#6a0572;color:white;border:none;border-radius:25px;font-family:inherit;font-weight:900;cursor:pointer;font-size:0.9rem">🖨️ فتح صفحة طباعة السهر</button>
@@ -6471,7 +6542,7 @@ ${body}
               </div>
               <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
                 <label style="font-size:0.82rem;font-weight:800;white-space:nowrap">📝 حجم الخط:</label>
-                <input id="sp_all_font" type="range" min="7" max="16" value="${suggestFont(allRows)}" step="1" style="flex:1;accent-color:#1a1a2e" oninput="document.getElementById('sp_all_fv').textContent=this.value+'px'">
+                <input id="sp_all_font" type="range" min="7" max="28" value="${suggestFont(allRows)}" step="1" style="flex:1;accent-color:#1a1a2e" oninput="document.getElementById('sp_all_fv').textContent=this.value+'px'">
                 <span id="sp_all_fv" style="font-weight:900;color:#1a1a2e;min-width:34px;text-align:center">${suggestFont(allRows)}px</span>
               </div>
               <button onclick="window._spDoPrint('all')" style="width:100%;padding:9px;background:#1a1a2e;color:#e6b800;border:none;border-radius:25px;font-family:inherit;font-weight:900;cursor:pointer;font-size:0.9rem">🖨️ فتح صفحة طباعة الكل</button>
