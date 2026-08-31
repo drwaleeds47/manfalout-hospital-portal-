@@ -5266,47 +5266,277 @@ let USERS = {
     `);
   };
 
-  // ─── دالة عرض الجدول للقراءة فقط (مستقلة عن فورم الإضافة) — مع صلاحية حذف/تعديل للأدمن فقط ───
+  // ─── مُنشئ الكتل بشكل "دفتر رسمي" (ترويسة المستشفى + جدول لكل يوم/نوبة) — نفس طريقة عرض دفاتر النوبتجيات ───
+  window._supv_buildBookBlocks = function(rows, meta, isAdminView, teamId, forPrint) {
+    if (!rows.length) return '<p style="padding:40px;text-align:center;color:#999;font-size:1.05rem;font-weight:700">📭 لا توجد سجلات مطابقة</p>';
+    const LOGO_URL = 'https://i.postimg.cc/7Z6Vb2DJ/swrt-watsab-btarykh-1447-03-24-fy-02-38-08-fc1d64cc.jpg';
+    const HEADER_HTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:3px solid #1a1a2e;background:#fafafa;direction:rtl">
+        <div style="line-height:1.9;direction:rtl">
+          <div style="font-weight:900;font-size:1.05rem;color:#1a1a2e;text-align:center;margin-bottom:3px">محافظـة أسيـوط</div>
+          <div style="font-weight:900;font-size:1.05rem;color:#1a1a2e;display:flex;justify-content:space-between;gap:6px">
+            <span>مديريـة</span><span>الصحـة</span><span>والسكـان</span><span>بأسيـوط</span>
+          </div>
+          <div style="font-weight:900;font-size:1.05rem;color:#1a1a2e;display:flex;justify-content:space-between;gap:6px">
+            <span>مستشفـى</span><span>منفلـوط</span><span>النموذجـي</span>
+          </div>
+          <div style="font-weight:900;font-size:1.05rem;color:#1a1a2e;display:flex;justify-content:space-between;gap:6px">
+            <span>لجنة</span><span>الإشراف</span><span>والحوكمة</span>
+          </div>
+        </div>
+        <div style="text-align:center;flex:0 0 auto">
+          <img src="${LOGO_URL}" alt="شعار المستشفى"
+            style="width:70px;height:70px;border-radius:50%;border:3px solid #1a1a2e;object-fit:cover;display:block;margin:0 auto 4px;box-shadow:0 2px 8px rgba(0,0,0,0.2)">
+          <div style="font-size:0.68rem;font-weight:800;color:#1a1a2e">لجنة الإشراف</div>
+        </div>
+      </div>`;
+
+    // تجميع الصفوف حسب التاريخ + نوع النوبة (نفس منطق buildUnifiedDailyTable في دفتر النوبتجيات)
+    const groups = {};
+    rows.forEach(r => {
+      const gk = (r.date || '—') + '|' + r.shift;
+      if (!groups[gk]) groups[gk] = { date: r.date, day: r.day, shift: r.shift, rows: [] };
+      groups[gk].rows.push(r);
+    });
+    const sortedKeys = Object.keys(groups).sort((a,b) => b.localeCompare(a));
+
+    let out = '';
+    sortedKeys.forEach(gk => {
+      const g = groups[gk];
+      const isNight = g.shift === 'night';
+      const hdrBg = isNight ? '#3a0050' : '#3b5bdb';
+      let rowNum = 0;
+      const trs = g.rows.map(r => {
+        rowNum++;
+        const adminBtns = (isAdminView && !forPrint)
+          ? `<div class="noprint" style="display:flex;gap:4px;justify-content:center">
+              <button onclick="window._supv_editApprovedRow(${teamId},'${r.docId}',${r.rowIndex})" style="background:#1565c0;color:#fff;border:none;border-radius:14px;padding:3px 9px;font-weight:900;font-size:0.72rem;cursor:pointer;font-family:inherit">✏️</button>
+              <button onclick="window._supv_deleteApprovedRow(${teamId},'${r.docId}',${r.rowIndex})" style="background:#e53935;color:#fff;border:none;border-radius:14px;padding:3px 9px;font-weight:900;font-size:0.72rem;cursor:pointer;font-family:inherit">🗑️</button>
+            </div>`
+          : '';
+        return `<tr style="background:${rowNum%2===0?'#f5f5fa':'#fff'}">
+          <td style="border:1px solid #bbb;padding:7px 5px;text-align:center;font-weight:800">${rowNum}</td>
+          <td style="border:1px solid #bbb;padding:7px 8px;font-weight:900;text-align:center;color:#1a1a2e">${r.name||''}</td>
+          <td style="border:1px solid #bbb;padding:7px 8px;font-size:0.88rem;text-align:center">${r.job||'—'}</td>
+          <td style="border:1px solid #bbb;padding:7px 8px;text-align:center">&nbsp;</td>
+          ${isAdminView && !forPrint ? `<td class="noprint" style="border:1px solid #bbb;padding:5px">${adminBtns}</td>` : ''}
+        </tr>`;
+      }).join('');
+
+      out += `
+        <div class="supv-book-block" style="break-inside:avoid;page-break-inside:avoid;margin-bottom:28px;border:2.5px solid ${hdrBg};border-radius:8px;overflow:hidden">
+          ${HEADER_HTML}
+          <div style="background:${hdrBg};color:#fff;padding:12px 16px;text-align:center">
+            <div style="font-size:1.15rem;font-weight:900;margin-bottom:8px">${meta.iconEmoji||'📘'} ${meta.title}</div>
+            <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:12px">
+              <span style="background:rgba(255,255,255,0.22);border-radius:20px;padding:5px 14px;font-size:0.92rem;font-weight:900">📅 ${g.date||'—'}${g.day?(' — '+g.day):''}</span>
+              <span style="background:rgba(255,255,255,0.22);border-radius:20px;padding:5px 14px;font-size:0.92rem;font-weight:900">${g.shift==='day'?'🌅 نوبتجية (8ص-8م)':'🌙 سهر (8م-8ص)'}</span>
+              <span style="background:rgba(255,255,255,0.22);border-radius:20px;padding:5px 14px;font-size:0.92rem;font-weight:900">الإجمالي: ${rowNum}</span>
+            </div>
+          </div>
+          <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+            <thead><tr style="background:linear-gradient(135deg,${hdrBg},${hdrBg})">
+              <th style="border:1px solid #aaa;color:#fff;padding:8px 5px;width:36px">م</th>
+              <th style="border:1px solid #aaa;color:#fff;padding:8px 8px">الاسم</th>
+              <th style="border:1px solid #aaa;color:#fff;padding:8px 8px">الوظيفة</th>
+              <th style="border:1px solid #aaa;color:#fff;padding:8px 8px">التوقيع</th>
+              ${isAdminView && !forPrint ? '<th style="border:1px solid #aaa;color:#fff;padding:8px 8px">إجراء</th>' : ''}
+            </tr></thead>
+            <tbody>${trs}</tbody>
+          </table></div>
+          <div style="text-align:center;padding:5px 12px;font-size:0.65rem;color:#aaa;border-top:1px solid #e0e0e0;background:#fafafa">
+            مع تحيات إدارة السيستم الإلكتروني الموحد · مستشفى منفلوط النموذجي · لجنة الإشراف والمتابعة
+          </div>
+        </div>`;
+    });
+    return out;
+  };
+
+  // ─── عرض الدفتر: نفس طريقة عرض "دفاتر النوبتجيات" (كتلة رسمية بترويسة لكل يوم/نوبة) + فلتر + طباعة + PDF + Excel + حذف/تعديل للأدمن ───
   window._supv_renderReadOnlySchedule = function(teamId, docsArr) {
     const el = document.getElementById(`_sv_saved_${teamId}`);
     if (!el) return;
-    const isAdminView = !!(currentUserData && currentUserData.type === 'admin');
     // الدفتر يعرض الجداول المعتمدة من الأدمن فقط — المسودات لا تظهر هنا حتى تُعتمد
     const approvedDocs = (docsArr || []).filter(d => d.status === 'approved');
-    if (!approvedDocs || approvedDocs.length === 0) {
+
+    // تحويل كل الجداول المعتمدة لصفوف مسطّحة (سجل واحد لكل شخص/نوبة) — مصدر واحد للفلترة/الطباعة/التصدير
+    let flat = [];
+    approvedDocs.forEach(d => {
+      (d.rows || []).forEach((r, idx) => {
+        flat.push({
+          docId: d._docId,
+          rowIndex: idx,
+          shift: r.shift || 'day',
+          day: r.day || '',
+          date: r.date || '',
+          name: r.name || '',
+          job: r.job || '—'
+        });
+      });
+    });
+    window._supv_flatData = window._supv_flatData || {};
+    window._supv_flatData[teamId] = flat;
+
+    if (!flat.length) {
       el.innerHTML = `<div style="text-align:center;color:#999;font-weight:700;padding:20px">لا توجد جداول معتمدة حتى الآن لهذا الفريق</div>`;
       return;
     }
-    const sorted = [...approvedDocs].sort((a,b) => (b.rows?.[0]?.date||'').localeCompare(a.rows?.[0]?.date||''));
-    const blocks = sorted.map(d => {
-      const rows = d.rows || [];
-      const first = rows[0] || {};
-      const statusBadge = `<span style="background:#2e7d32;color:#fff;border-radius:20px;padding:3px 12px;font-size:0.75rem;font-weight:900">✅ معتمد</span>`;
-      const deleteBtn = isAdminView
-        ? `<button onclick="window._supv_deleteApprovedSchedule(${teamId},'${d._docId}')" style="background:#e53935;color:#fff;border:none;border-radius:20px;padding:5px 14px;font-weight:900;font-size:0.75rem;cursor:pointer;font-family:inherit">🗑️ حذف</button>`
-        : '';
-      const trs = rows.map((r,i) => `
-        <tr>
-          <td style="padding:6px 10px;font-weight:700">${r.shift === 'day' ? '🌅 نوبتجية' : '🌙 سهر'}</td>
-          <td style="padding:6px 10px;font-weight:700">${r.day||''}</td>
-          <td style="padding:6px 10px;font-weight:700">${r.date||''}</td>
-          <td style="padding:6px 10px;font-weight:900;color:#3b5bdb">${r.name||''}</td>
-          <td style="padding:6px 10px;font-size:0.85rem">${r.job||'—'}</td>
-          ${isAdminView ? `<td style="padding:6px 10px"><button onclick="window._supv_editApprovedRow(${teamId},'${d._docId}',${i})" style="background:#1565c0;color:#fff;border:none;border-radius:16px;padding:3px 12px;font-weight:900;font-size:0.72rem;cursor:pointer;font-family:inherit">✏️ تعديل</button></td>` : ''}
-        </tr>`).join('');
-      return `
-        <div style="border:2px solid #d0d0e0;border-radius:14px;overflow:hidden;margin-bottom:12px">
-          <div style="background:#f5f5fa;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-            <span style="font-weight:900;color:#1a1a2e">📅 ${first.date||'—'} — ${first.day||''}</span>
-            <div style="display:flex;align-items:center;gap:8px">${statusBadge}${deleteBtn}</div>
-          </div>
-          <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:inherit">
-            <thead><tr style="background:#fafafa"><th style="padding:6px 10px;border-bottom:2px solid #d0d0e0">النوبة</th><th style="padding:6px 10px;border-bottom:2px solid #d0d0e0">اليوم</th><th style="padding:6px 10px;border-bottom:2px solid #d0d0e0">التاريخ</th><th style="padding:6px 10px;border-bottom:2px solid #d0d0e0">الاسم</th><th style="padding:6px 10px;border-bottom:2px solid #d0d0e0">الوظيفة</th>${isAdminView ? '<th style="padding:6px 10px;border-bottom:2px solid #d0d0e0">إجراء</th>' : ''}</tr></thead>
-            <tbody>${trs}</tbody>
-          </table></div>
-        </div>`;
-    }).join('');
-    el.innerHTML = blocks;
+
+    el.innerHTML = `
+      <div style="background:#fff;border:2px solid #ddd;border-radius:14px;padding:14px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="_svf_search_${teamId}" placeholder="🔍 بحث بالاسم أو الوظيفة..." oninput="window._supv_filterTable(${teamId})" style="flex:1;min-width:180px;padding:9px 12px;border:2px solid #ccc;border-radius:10px;font-family:inherit;font-weight:700">
+        <input type="date" id="_svf_from_${teamId}" onchange="window._supv_filterTable(${teamId})" title="من تاريخ" style="padding:9px;border:2px solid #ccc;border-radius:10px;font-family:inherit;font-weight:700">
+        <span style="font-weight:800;color:#888">إلى</span>
+        <input type="date" id="_svf_to_${teamId}" onchange="window._supv_filterTable(${teamId})" title="إلى تاريخ" style="padding:9px;border:2px solid #ccc;border-radius:10px;font-family:inherit;font-weight:700">
+        <select id="_svf_shift_${teamId}" onchange="window._supv_filterTable(${teamId})" style="padding:9px;border:2px solid #ccc;border-radius:10px;font-family:inherit;font-weight:700">
+          <option value="all">كل الأنواع</option>
+          <option value="day">🌅 نوبتجية</option>
+          <option value="night">🌙 سهر</option>
+        </select>
+        <button onclick="window._supv_clearFilter(${teamId})" style="padding:9px 16px;background:#eee;border:none;border-radius:20px;font-weight:800;cursor:pointer;font-family:inherit">🔄 مسح الفلتر</button>
+        <button onclick="window._supv_printTable(${teamId})" style="padding:9px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:20px;font-weight:800;cursor:pointer;font-family:inherit">🖨️ طباعة</button>
+        <button onclick="window._supv_downloadPDF(${teamId})" style="padding:9px 16px;background:#c0392b;color:#fff;border:none;border-radius:20px;font-weight:800;cursor:pointer;font-family:inherit">📄 تحميل PDF</button>
+        <button onclick="window._supv_exportTable(${teamId})" style="padding:9px 16px;background:#2e7d32;color:#fff;border:none;border-radius:20px;font-weight:800;cursor:pointer;font-family:inherit">📊 تحميل Excel</button>
+      </div>
+      <div id="_sv_table_wrap_${teamId}"></div>
+    `;
+    window._supv_filterTable(teamId);
+  };
+
+  // ─── تطبيق الفلتر (بحث/تاريخ/نوع النوبة) وإعادة رسم الكتل ───
+  window._supv_filterTable = function(teamId) {
+    const flat = (window._supv_flatData && window._supv_flatData[teamId]) || [];
+    const isAdminView = !!(currentUserData && currentUserData.type === 'admin');
+    const el = id => document.getElementById(id);
+    const searchV = (el(`_svf_search_${teamId}`)?.value || '').trim().toLowerCase();
+    const fromV   = el(`_svf_from_${teamId}`)?.value || '';
+    const toV     = el(`_svf_to_${teamId}`)?.value || '';
+    const shiftV  = el(`_svf_shift_${teamId}`)?.value || 'all';
+
+    let filtered = flat.filter(r => {
+      if (searchV && !((r.name||'').toLowerCase().includes(searchV) || (r.job||'').toLowerCase().includes(searchV))) return false;
+      if (fromV && r.date && r.date < fromV) return false;
+      if (toV && r.date && r.date > toV) return false;
+      if (shiftV !== 'all' && r.shift !== shiftV) return false;
+      return true;
+    });
+    filtered.sort((a,b) => (b.date||'').localeCompare(a.date||'') || (a.name||'').localeCompare(b.name||'','ar'));
+
+    window._supv_currentFiltered = window._supv_currentFiltered || {};
+    window._supv_currentFiltered[teamId] = filtered;
+
+    const wrap = document.getElementById(`_sv_table_wrap_${teamId}`);
+    if (!wrap) return;
+    const meta = (window._supv_viewMeta && window._supv_viewMeta[teamId]) || { title: 'دفتر', iconEmoji: '📘' };
+    wrap.innerHTML = `<div style="margin-bottom:10px;font-weight:900;color:#555;font-size:0.85rem">📋 عدد السجلات المطابقة: ${filtered.length}</div>`
+      + window._supv_buildBookBlocks(filtered, meta, isAdminView, teamId, false);
+  };
+
+  // ─── مسح الفلتر وإعادة العرض الكامل ───
+  window._supv_clearFilter = function(teamId) {
+    const el = id => document.getElementById(id);
+    if (el(`_svf_search_${teamId}`)) el(`_svf_search_${teamId}`).value = '';
+    if (el(`_svf_from_${teamId}`))   el(`_svf_from_${teamId}`).value   = '';
+    if (el(`_svf_to_${teamId}`))     el(`_svf_to_${teamId}`).value     = '';
+    if (el(`_svf_shift_${teamId}`))  el(`_svf_shift_${teamId}`).value  = 'all';
+    window._supv_filterTable(teamId);
+  };
+
+  // ─── طباعة الجدول المفلتر الحالي (نفس شكل الكتل الرسمية، بدون أزرار الإدارة) ───
+  window._supv_printTable = function(teamId) {
+    const filtered = (window._supv_currentFiltered && window._supv_currentFiltered[teamId]) || [];
+    if (!filtered.length) { showToast('⚠️ لا توجد بيانات للطباعة'); return; }
+    const meta = (window._supv_viewMeta && window._supv_viewMeta[teamId]) || { title: 'دفتر', iconEmoji: '📘' };
+    const blocksHtml = window._supv_buildBookBlocks(filtered, meta, false, teamId, true);
+    const w = window.open('','_blank');
+    w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${meta.title}</title>
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+      <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Cairo',sans-serif;direction:rtl;padding:16px;background:#f5f5f5}
+      .noprint{margin-bottom:14px;display:flex;gap:8px}
+      @page{size:A4 portrait;margin:8mm}@media print{.noprint{display:none!important}body{background:#fff}}</style></head><body>
+      <div class="noprint"><button onclick="window.print()" style="background:#1a1a2e;color:#e6b800;padding:8px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">🖨️ طباعة / حفظ PDF</button>
+      <button onclick="window.close()" style="background:#636e72;color:#fff;padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px">✖ إغلاق</button></div>
+      ${blocksHtml}
+      </body></html>`);
+    w.document.close();
+  };
+
+  // ─── تحميل ملف PDF فعلي (html2canvas + jsPDF) — نفس أسلوب دفاتر النوبتجيات ───
+  window._supv_downloadPDF = async function(teamId) {
+    const filtered = (window._supv_currentFiltered && window._supv_currentFiltered[teamId]) || [];
+    if (!filtered.length) { showToast('⚠️ لا توجد بيانات لتحميلها'); return; }
+    const meta = (window._supv_viewMeta && window._supv_viewMeta[teamId]) || { title: 'دفتر', iconEmoji: '📘' };
+    const blocksHtml = window._supv_buildBookBlocks(filtered, meta, false, teamId, true);
+    showToast('⏳ جاري إنشاء ملف PDF...');
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:794px;height:1123px;border:none;visibility:hidden';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+      <style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:770px;direction:rtl;font-family:'Cairo',sans-serif;font-size:12px}body{padding:12px}
+      table{border-collapse:collapse;width:100%}th,td{border:1px solid #333}.noprint{display:none!important}</style>
+      </head><body>${blocksHtml}</body></html>`);
+    iframe.contentDocument.close();
+    await new Promise(r => setTimeout(r, 1200));
+    function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`)){res();return;}const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+    try {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      const iframeBody = iframe.contentDocument.body;
+      const totalHeight = iframeBody.scrollHeight;
+      const pageW = 794, pageH = 1123;
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [pageW, pageH] });
+      let rendered = 0, firstPage = true;
+      while (rendered < totalHeight) {
+        const canvas = await window.html2canvas(iframeBody, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff', y: rendered, height: Math.min(pageH-20, totalHeight-rendered), width: pageW, scrollY: rendered });
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        if (!firstPage) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, 0, pageW, Math.min(pageH, totalHeight - rendered));
+        rendered += (pageH - 20); firstPage = false;
+      }
+      pdf.save((meta.title||'دفتر').replace(/\s+/g,'_') + '.pdf');
+      showToast('✅ تم تحميل PDF بنجاح!');
+    } catch(err) { showToast('⚠️ خطأ في إنشاء PDF: ' + err.message); }
+    finally { document.body.removeChild(iframe); }
+  };
+
+  // ─── تصدير الجدول المفلتر الحالي كملف Excel/CSV قابل للتحميل ───
+  window._supv_exportTable = function(teamId) {
+    const filtered = (window._supv_currentFiltered && window._supv_currentFiltered[teamId]) || [];
+    if (!filtered.length) { showToast('⚠️ لا توجد بيانات للتصدير'); return; }
+    const meta = (window._supv_viewMeta && window._supv_viewMeta[teamId]) || { title: 'دفتر' };
+    let csv = '\uFEFF#,النوبة,اليوم,التاريخ,الاسم,الوظيفة\n';
+    filtered.forEach((r,i) => {
+      csv += `"${i+1}","${r.shift==='day'?'نوبتجية':'سهر'}","${r.day||''}","${r.date||''}","${r.name}","${r.job||'—'}"\n`;
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    a.download = (meta.title||'دفتر').replace(/\s+/g,'_') + '.csv';
+    a.click();
+    showToast('✅ تم تصدير الملف');
+  };
+
+  // ─── حذف سجل واحد (شخص/نوبة) من دفتر معتمد (أدمن فقط) — يحذف المستند بالكامل لو أصبح فارغاً ───
+  window._supv_deleteApprovedRow = async function(teamId, docId, rowIndex) {
+    if (!currentUserData || currentUserData.type !== 'admin') { showToast('🔒 هذه الميزة متاحة للإدمن فقط'); return; }
+    if (!confirm('⚠️ هل تريد حذف هذا السجل نهائياً من الدفتر؟')) return;
+    try {
+      const dref = doc(db, 'supervision_schedules', docId);
+      const dsnap = await getDoc(dref);
+      if (!dsnap.exists()) { showToast('⚠️ لم يُعثر على الجدول'); return; }
+      const data = dsnap.data();
+      const rows = data.rows || [];
+      if (rowIndex < 0 || rowIndex >= rows.length) { showToast('⚠️ لم يُعثر على السجل'); return; }
+      rows.splice(rowIndex, 1);
+      if (rows.length === 0) {
+        await deleteDoc(dref);
+      } else {
+        await updateDoc(dref, { rows: rows, lastEditedBy: currentUser, lastEditedAt: serverTimestamp() });
+      }
+      showToast('🗑️ تم حذف السجل بنجاح');
+      window._supv_reloadViewSchedule(teamId);
+    } catch(e) { showToast('⚠️ خطأ أثناء الحذف: ' + e.message); }
   };
 
   // ─── عارض للقراءة فقط: يعرض الجداول المعتمدة لفريق معيّن، مع صلاحية حذف/تعديل للأدمن فقط ───
@@ -9382,6 +9612,9 @@ window.editEmpCard = function(idx) {
               ${holidayOpts}
             </select>
             ${readOnly ? '' : '<button onclick="window._hol_loadFromFirebase()" style="padding:8px 16px;background:#7048e8;color:#fff;border:none;border-radius:20px;font-family:inherit;font-weight:800;cursor:pointer;font-size:0.85rem">🔄 تحميل المحفوظ</button>'}
+            <button onclick="window._hol_printTable()" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:20px;font-family:inherit;font-weight:800;cursor:pointer;font-size:0.85rem">🖨️ طباعة</button>
+            <button onclick="window._hol_downloadPDF()" style="padding:8px 16px;background:#c0392b;color:#fff;border:none;border-radius:20px;font-family:inherit;font-weight:800;cursor:pointer;font-size:0.85rem">📄 تحميل PDF</button>
+            <button onclick="window._hol_exportCSV()" style="padding:8px 16px;background:#2e7d32;color:#fff;border:none;border-radius:20px;font-family:inherit;font-weight:800;cursor:pointer;font-size:0.85rem">📊 تحميل Excel</button>
           </div>
 
           <!-- جدول العرض -->
@@ -9486,15 +9719,19 @@ window.editEmpCard = function(idx) {
 
       window._hol_renderTable = function() {
         const rows = window._hol_rows || [];
+        const isAdminView = !!(currentUserData && currentUserData.type === 'admin');
         const unitF    = document.getElementById('_hol_filter_unit')?.value    || 'all';
         const holidayF = document.getElementById('_hol_filter_holiday')?.value || 'all';
         const filtered = rows.filter(r =>
           (unitF    === 'all' || r.unit    === unitF) &&
           (holidayF === 'all' || r.holiday === holidayF)
         );
+        window._hol_currentFiltered = filtered;
         const container = document.getElementById('_hol_table_container');
         if (!container) return;
         if (!filtered.length) { container.innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;font-weight:700">📭 لا توجد بيانات مطابقة</div>'; return; }
+        // الحذف متاح للأدمن فقط دائماً (سواء في شاشة القراءة فقط أو شاشة الإدخال)
+        const showDelete = isAdminView;
         const trs = filtered.map((r,i) => `
           <tr style="background:${i%2===0?'#fffde7':'#fff'}">
             <td style="padding:8px 10px;text-align:center;font-weight:700">${i+1}</td>
@@ -9505,9 +9742,9 @@ window.editEmpCard = function(idx) {
             <td style="padding:8px 10px;text-align:center;color:#2e7d32;font-weight:800">${r.from}</td>
             <td style="padding:8px 10px;text-align:center;color:#c0392b;font-weight:800">${r.to||r.from}</td>
             <td style="padding:8px 10px;font-size:0.82rem;color:#777">${r.notes}</td>
-            ${window._hol_readOnly ? '' : `<td style="padding:8px 10px;text-align:center">
-              <button onclick="window._hol_rows.splice(${rows.indexOf(r)},1);window._hol_renderTable()" style="background:#e53935;color:#fff;border:none;border-radius:8px;padding:3px 10px;cursor:pointer;font-weight:900">🗑️</button>
-            </td>`}
+            ${showDelete ? `<td style="padding:8px 10px;text-align:center">
+              <button onclick="window._hol_deleteRow(${rows.indexOf(r)})" style="background:#e53935;color:#fff;border:none;border-radius:8px;padding:3px 10px;cursor:pointer;font-weight:900">🗑️</button>
+            </td>` : ''}
           </tr>`).join('');
         container.innerHTML = `
           <div style="border:3px solid #f57f17;border-radius:14px;overflow:hidden">
@@ -9522,11 +9759,36 @@ window.editEmpCard = function(idx) {
                 <th style="padding:8px;border-bottom:2px solid #f57f17">من</th>
                 <th style="padding:8px;border-bottom:2px solid #f57f17">إلى</th>
                 <th style="padding:8px;border-bottom:2px solid #f57f17">ملاحظات</th>
-                ${window._hol_readOnly ? '' : '<th style="padding:8px;border-bottom:2px solid #f57f17">حذف</th>'}
+                ${showDelete ? '<th style="padding:8px;border-bottom:2px solid #f57f17">حذف</th>' : ''}
               </tr></thead>
               <tbody>${trs}</tbody>
             </table></div>
           </div>`;
+      };
+
+      // ─── حذف سجل إجازة (أدمن فقط) — يحذف من قاعدة البيانات نهائياً لو كان محفوظاً، وإلا من الجدول المحلي فقط ───
+      window._hol_deleteRow = async function(rowsIdx) {
+        if (!currentUserData || currentUserData.type !== 'admin') { showToast('🔒 هذه الميزة متاحة للإدمن فقط'); return; }
+        if (!confirm('⚠️ هل تريد حذف هذا السجل نهائياً؟')) return;
+        const row = (window._hol_rows || [])[rowsIdx];
+        if (!row) return;
+        try {
+          if (row._docId) {
+            const dref = doc(db, 'holiday_schedules', row._docId);
+            const dsnap = await getDoc(dref);
+            if (dsnap.exists()) {
+              const data = dsnap.data();
+              const docRows = data.rows || [];
+              const idxInDoc = typeof row._rowIdx === 'number' ? row._rowIdx : -1;
+              if (idxInDoc > -1 && idxInDoc < docRows.length) docRows.splice(idxInDoc, 1);
+              if (docRows.length === 0) await deleteDoc(dref);
+              else await updateDoc(dref, { rows: docRows, lastEditedBy: currentUser, lastEditedAt: serverTimestamp() });
+            }
+          }
+          window._hol_rows.splice(rowsIdx, 1);
+          window._hol_renderTable();
+          showToast('🗑️ تم حذف السجل بنجاح');
+        } catch(e) { showToast('⚠️ خطأ أثناء الحذف: ' + e.message); }
       };
 
       window._hol_saveToFirebase = async function() {
@@ -9557,15 +9819,19 @@ window.editEmpCard = function(idx) {
         try {
           const snap = await getDocs(collection(db, 'holiday_schedules'));
           let allRows = [];
-          snap.forEach(d => { const data = d.data(); if (data.rows) allRows = allRows.concat(data.rows); });
+          snap.forEach(d => {
+            const data = d.data();
+            (data.rows || []).forEach((r, idx) => allRows.push({ ...r, _docId: d.id, _rowIdx: idx }));
+          });
           window._hol_rows = allRows;
           window._hol_renderTable();
           showToast(allRows.length ? `✅ تم تحميل ${allRows.length} سجل` : '📭 لا توجد بيانات محفوظة');
         } catch(e) { showToast('⚠️ خطأ في التحميل: ' + e.message); }
       };
 
+      // ─── طباعة الجدول المفلتر الحالي (وليس كل السجلات دون فلترة) ───
       window._hol_printTable = function() {
-        const rows = window._hol_rows || [];
+        const rows = window._hol_currentFiltered || window._hol_rows || [];
         if (!rows.length) { showToast('⚠️ الجدول فارغ'); return; }
         const trs = rows.map((r,i) => `<tr style="background:${i%2===0?'#fffde7':'#fff'}">
           <td>${i+1}</td><td>${r.unit}</td><td>${r.holiday}</td><td>${r.name}</td>
@@ -9585,6 +9851,73 @@ window.editEmpCard = function(idx) {
         <table><thead><tr><th>#</th><th>الوحدة</th><th>المناسبة</th><th>الموظف</th><th>الوظيفة</th><th>من</th><th>إلى</th><th>ملاحظات</th></tr></thead>
         <tbody>${trs}</tbody></table></body></html>`);
         w.document.close();
+      };
+
+      // ─── تحميل ملف PDF فعلي (html2canvas + jsPDF) — نفس أسلوب دفاتر النوبتجيات ───
+      window._hol_downloadPDF = async function() {
+        const rows = window._hol_currentFiltered || window._hol_rows || [];
+        if (!rows.length) { showToast('⚠️ لا توجد بيانات لتحميلها'); return; }
+        const trs = rows.map((r,i) => `<tr style="background:${i%2===0?'#fffde7':'#fff'}">
+          <td>${i+1}</td><td>${r.unit}</td><td>${r.holiday}</td><td>${r.name}</td>
+          <td>${r.job}</td><td>${r.from}</td><td>${r.to||r.from}</td><td>${r.notes}</td>
+        </tr>`).join('');
+        const content = `<h2 style="text-align:center;margin-bottom:15px;color:#e65100">🎉 جدول إجازات الأعياد والمناسبات الرسمية - مستشفى منفلوط النموذجي</h2>
+          <table style="width:100%;border-collapse:collapse"><thead><tr>
+          <th style="background:#f57f17;color:#fff;padding:8px;border:1px solid #ddd">#</th>
+          <th style="background:#f57f17;color:#fff;padding:8px;border:1px solid #ddd">الوحدة</th>
+          <th style="background:#f57f17;color:#fff;padding:8px;border:1px solid #ddd">المناسبة</th>
+          <th style="background:#f57f17;color:#fff;padding:8px;border:1px solid #ddd">الموظف</th>
+          <th style="background:#f57f17;color:#fff;padding:8px;border:1px solid #ddd">الوظيفة</th>
+          <th style="background:#f57f17;color:#fff;padding:8px;border:1px solid #ddd">من</th>
+          <th style="background:#f57f17;color:#fff;padding:8px;border:1px solid #ddd">إلى</th>
+          <th style="background:#f57f17;color:#fff;padding:8px;border:1px solid #ddd">ملاحظات</th>
+          </tr></thead><tbody>${trs}</tbody></table>`;
+        showToast('⏳ جاري إنشاء ملف PDF...');
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1122px;height:794px;border:none;visibility:hidden';
+        document.body.appendChild(iframe);
+        iframe.contentDocument.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+          <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+          <style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:1100px;direction:rtl;font-family:'Cairo',sans-serif;font-size:12px}body{padding:14px}td{padding:7px;border:1px solid #ddd}</style>
+          </head><body>${content}</body></html>`);
+        iframe.contentDocument.close();
+        await new Promise(r => setTimeout(r, 1200));
+        function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`)){res();return;}const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+        try {
+          await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+          await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+          const iframeBody = iframe.contentDocument.body;
+          const totalHeight = iframeBody.scrollHeight;
+          const pageW = 1122, pageH = 794;
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [pageW, pageH] });
+          let rendered = 0, firstPage = true;
+          while (rendered < totalHeight) {
+            const canvas = await window.html2canvas(iframeBody, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff', y: rendered, height: Math.min(pageH-20, totalHeight-rendered), width: pageW, scrollY: rendered });
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            if (!firstPage) pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, 0, pageW, Math.min(pageH, totalHeight - rendered));
+            rendered += (pageH - 20); firstPage = false;
+          }
+          pdf.save('جدول_إجازات_الأعياد.pdf');
+          showToast('✅ تم تحميل PDF بنجاح!');
+        } catch(err) { showToast('⚠️ خطأ في إنشاء PDF: ' + err.message); }
+        finally { document.body.removeChild(iframe); }
+      };
+
+      // ─── تصدير الجدول المفلتر الحالي كملف CSV ───
+      window._hol_exportCSV = function() {
+        const rows = window._hol_currentFiltered || window._hol_rows || [];
+        if (!rows.length) { showToast('⚠️ لا توجد بيانات للتصدير'); return; }
+        let csv = '\uFEFF#,الوحدة,المناسبة,الموظف,الوظيفة,من,إلى,ملاحظات\n';
+        rows.forEach((r,i) => {
+          csv += `"${i+1}","${r.unit||''}","${r.holiday||''}","${r.name||''}","${r.job||''}","${r.from||''}","${r.to||r.from||''}","${r.notes||''}"\n`;
+        });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+        a.download = 'جدول_إجازات_الأعياد.csv';
+        a.click();
+        showToast('✅ تم تصدير الملف');
       };
 
       // تحميل البيانات تلقائياً
