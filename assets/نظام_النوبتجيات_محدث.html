@@ -2911,7 +2911,24 @@ let USERS = {
     },
     electronic_registration_book: {
       'التسجيل الالكتروني': ["تسجيل اليكتروني"]
-    }
+    },
+    // ==== قوائم الدفاتر الفرعية الجديدة (مطابقة تمامًا لتبويب كل فرع داخل دفتر النوبتجيات) ====
+    sub_specialist_doctors:     { 'الأطباء البشري': ["الباطنه","الكلي الصناعي","عنايه عامه","عنايه قلب","عنايه عصبيه","عنايه باطنه","استقبال باطنة","الاطفال والمبتسرين","استقبال اطفال","النساء والتوليد","استقبال نساء","الجراحه العامه","استقبال جراحه عامه","العظام","استقبال عظام","التخدير","نواب التخدير","الاستقبال والطوارئ","استقبال الباطنه والكلي","باثولوجي اكلنيكي","مناظير","أطباء الاشعه"] },
+    sub_specialist_dentists:    { 'أطباء الأسنان (عيادات مسائية)': ["اطباء اسنان"] },
+    sub_specialist_pharmacists: { 'الصيادلة': ["صيدليه الطوارئ","صيدلية الاقتصادي","صيدليه الاقسام الداخليه","صيدليه المخدرات","صيدلية التامين الصحي","صيدلية العمليات","صيدلية التوريدات","صيدلية نفقة الدولة داخلي","صيدلية نفقة الدولة خارجي","صيدلية المجاني الخارجي","الكلي الصناعي صيدلية","الصيدليه الإكلينكيه","نائب الصيدلي الاول","مخزن الطعوم والامصال","مخزن مستلزمات العظام","مخزن المستهلك المجاني","مستلزمات تخصصيه قلب مفتوح","مخزن الادوية المجاني","مخزن الازمات والكوارث"] },
+    sub_specialist_physio:      { 'العلاج الطبيعي (عيادات مسائية)': ["العلاج الطبيعي"] },
+    sub_specialist_nursing:     { 'أخصائي تمريض': ["اخصائي تمريض"] },
+    sub_technical_nursing:      { 'فني تمريض': ["فني تمريض"] },
+    sub_technical_lab:          { 'فني معمل': ["فنيين معمل"] },
+    sub_technical_dental:       { 'فني أسنان': ["فنيين اسنان"] },
+    sub_technical_bloodbank:    { 'فني بنك دم': ["فنيين بنك دم"] },
+    sub_technical_radiology:    { 'فني أشعة (رنين مغناطيسي + عادي)': ["فنيين اشعه"] },
+    sub_technical_emergency:    { 'فني خدمات طبية عاجلة': ["فني خدمات طبيه","فني تمريض خدمات طبية عاجلة"] },
+    sub_technical_maint:        { 'فني صيانة أجهزة طبية': ["فني اجهزة طبية","فنيين هندسه"] },
+    sub_technical_records:      { 'فني تسجيل طبي وإحصاء': ["فنيين تسجيل طبي","تسجيل اليكتروني","خدمات مكتب الدخول"] },
+    sub_clerical_treasury:      { 'أعمال الخزنة': ["اداري الخزينه"] },
+    sub_clerical_switch:        { 'السويتش': ["اداري السويتش"] },
+    sub_clerical_workers:       { 'العمال': ["العمال"] }
   };
 
   window.showUnifiedSetupScreen = function(sectionType, title) {
@@ -3941,17 +3958,85 @@ let USERS = {
   };
 
   // ==================== القسم 6: نوبتجيات العطلات ====================
-  window.renderHolidayShifts = function() {
-    const holidays = ['عيد الفطر المبارك','عيد الأضحى المبارك','الميلاد المجيد','القيامة المجيدة','شم النسيم','عيد القوات المسلحة','المولد النبوي','رأس السنة الهجرية','ثورة 25 يناير','ثورة 23 يوليو','عيد العمال','تحرير سيناء','30 يونيه'];
+  // ── الأعياد والعطلات الثابتة (تُحسب تلقائيًا من السنة الميلادية بدون تدخل) ──
+  const FIXED_HOLIDAYS = {
+    'رأس السنة الميلادية':      (y) => `${y}-01-01`,
+    'عيد الشرطة وثورة 25 يناير': (y) => `${y}-01-25`,
+    'عيد تحرير سيناء':           (y) => `${y}-04-25`,
+    'عيد العمال':                (y) => `${y}-05-01`,
+    'عيد ثورة 30 يونيو':         (y) => `${y}-06-30`,
+    'عيد ثورة 23 يوليو':         (y) => `${y}-07-23`,
+    'عيد القوات المسلحة':        (y) => `${y}-10-06`,
+    'شم النسيم':                 (y) => null, // مرتبط بتاريخ عيد القيامة القبطي (متغير) — يُحسب من التاريخ اليدوي أدناه
+  };
+  // ── الأعياد المتغيرة (هجري/قبطي) — تُحدَّث يدويًا مرة كل سنة من الأدمن (تاريخ تقريبي) وتُحفظ بالسنة في Firebase ──
+  const VARIABLE_HOLIDAY_NAMES = ['عيد الفطر المبارك','عيد الأضحى المبارك','رأس السنة الهجرية','المولد النبوي الشريف','الميلاد المجيد (القبطي)','عيد القيامة المجيدة','شم النسيم'];
+  window._variableHolidayDates = window._variableHolidayDates || {}; // { '2026': { 'عيد الفطر المبارك': '2026-03-20', ... } }
+
+  async function _loadVariableHolidayDates() {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'variableHolidayDates'));
+      if (snap.exists()) window._variableHolidayDates = snap.data() || {};
+    } catch(e) { console.log('holiday dates load error:', e); }
+  }
+  window._loadVariableHolidayDates = _loadVariableHolidayDates;
+
+  function _allHolidayNamesForYear(year) {
+    return [...Object.keys(FIXED_HOLIDAYS), ...VARIABLE_HOLIDAY_NAMES];
+  }
+  function _holidayDateFor(name, year) {
+    if (FIXED_HOLIDAYS[name]) { const d = FIXED_HOLIDAYS[name](year); if (d) return d; }
+    const yearMap = window._variableHolidayDates[String(year)] || {};
+    return yearMap[name] || '';
+  }
+
+  window.renderHolidayDatesAdmin = function() {
+    const year = new Date().getFullYear();
+    const yearMap = window._variableHolidayDates[String(year)] || {};
+    showModal(`
+      <div class="section-header"><h2>🗓️ تحديد تواريخ الأعياد المتغيرة (هجري/قبطي) — سنة ${year}</h2>
+      <p class="legal-ref">الأعياد الميلادية الثابتة (رأس السنة، 25 يناير، 25 أبريل، أول مايو، 30 يونيه، 23 يوليو، 6 أكتوبر) تُحسب تلقائيًا. أدخل هنا فقط التواريخ التقريبية للأعياد الهجرية/القبطية لهذا العام.</p></div>
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:480px;margin:0 auto">
+        ${VARIABLE_HOLIDAY_NAMES.map(n => `
+          <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
+            <label style="font-weight:900;flex:1">🎉 ${n}</label>
+            <input type="date" id="vhd_${n.replace(/\s|\(|\)/g,'_')}" value="${yearMap[n]||''}" style="padding:8px;border:2px solid #1a1a2e;border-radius:10px"/>
+          </div>
+        `).join('')}
+      </div>
+      <div class="form-actions" style="margin-top:20px;text-align:center">
+        <button class="btn-save" onclick="window._saveVariableHolidayDates(${year})">💾 حفظ تواريخ سنة ${year}</button>
+      </div>
+    `);
+  };
+
+  window._saveVariableHolidayDates = async function(year) {
+    const yearMap = {};
+    VARIABLE_HOLIDAY_NAMES.forEach(n => {
+      const v = document.getElementById('vhd_' + n.replace(/\s|\(|\)/g,'_'))?.value;
+      if (v) yearMap[n] = v;
+    });
+    window._variableHolidayDates[String(year)] = yearMap;
+    try {
+      await setDoc(doc(db, 'settings', 'variableHolidayDates'), window._variableHolidayDates);
+      showToast('✅ تم حفظ تواريخ الأعياد لسنة ' + year);
+    } catch(e) { showToast('⚠️ تعذر الحفظ: ' + e.message); }
+  };
+
+  window.renderHolidayShifts = async function() {
+    if (!Object.keys(window._variableHolidayDates).length) await _loadVariableHolidayDates();
+    const year = new Date().getFullYear();
+    const holidays = _allHolidayNamesForYear(year);
     showModal(`
       <div class="section-header"><h2>📅 نوبتجيات العطلات والأعياد الرسمية</h2><p class="legal-ref">طبقاً لقانون الخدمة المدنية رقم 81 لعام 2016م - المادة رقم (47)</p></div>
       <div class="holiday-form">
-        <div class="form-row" style="display:flex;gap:15px;margin-bottom:15px;flex-wrap:wrap">
+        <div class="form-row" style="display:flex;gap:15px;margin-bottom:6px;flex-wrap:wrap;align-items:center">
           <label style="font-weight:900">🎉 المناسبة:</label>
-          <select id="holidaySelect" style="flex:1;padding:10px;border:2px solid #1a1a2e;border-radius:10px">${holidays.map(h => `<option>${h}</option>`).join('')}</select>
+          <select id="holidaySelect" style="flex:1;padding:10px;border:2px solid #1a1a2e;border-radius:10px" onchange="window._autoFillHolidayDate()">${holidays.map(h => `<option>${h}</option>`).join('')}</select>
           <label style="font-weight:900">📅 التاريخ:</label>
-          <input type="date" id="holidayDate" style="padding:10px;border:2px solid #1a1a2e;border-radius:10px" value="${new Date().toISOString().split('T')[0]}"/>
+          <input type="date" id="holidayDate" style="padding:10px;border:2px solid #1a1a2e;border-radius:10px" value="${_holidayDateFor(holidays[0], year) || new Date().toISOString().split('T')[0]}"/>
         </div>
+        ${currentUserData && currentUserData.type === 'admin' ? `<div style="margin-bottom:12px"><span onclick="window.renderHolidayDatesAdmin()" style="cursor:pointer;text-decoration:underline;font-size:0.8rem;font-weight:800;color:#8a5d00">🛠️ تعديل تواريخ الأعياد الهجرية/القبطية لهذا العام</span></div>` : ''}
         <div class="shift-tabs" style="display:flex;gap:0;margin:15px 0">
           <button class="tab-btn active" style="padding:12px 25px;background:var(--primary-gold);border:2px solid #1a1a2e;cursor:pointer;font-weight:800" onclick="showHolidayTable('day',this)">🌅 النوبتجية (8ص-8م)</button>
           <button class="tab-btn" style="padding:12px 25px;background:#eee;border:2px solid #1a1a2e;cursor:pointer;font-weight:800" onclick="showHolidayTable('night',this)">🌙 السهر (8م-8ص)</button>
@@ -3960,6 +4045,13 @@ let USERS = {
       </div>
     `);
     showHolidayTable('day', document.querySelector('.tab-btn.active'));
+  };
+
+  window._autoFillHolidayDate = function() {
+    const name = document.getElementById('holidaySelect')?.value;
+    const year = new Date().getFullYear();
+    const d = _holidayDateFor(name, year);
+    if (d) { const el = document.getElementById('holidayDate'); if (el) el.value = d; }
   };
 
   window.showHolidayTable = function(type, btn) {
@@ -5645,7 +5737,6 @@ let USERS = {
     const cards = [
       { icon:'✅', title:'شاشة الموافقات', sub:'قيد الموافقة • تم الموافقة عليها • مرفوضة', fn:'renderApprovalsHub', colors:['#1b5e20','#2e7d32'] },
       { icon:'📖', title:'دفتر النوبتجيات', sub:'الجداول المعتمدة', fn:'renderShiftBook', colors:['#1a1a2e','#3d3d6b'] },
-      { icon:'⚖️', title:'الإدارة الإشرافية العليا', sub:'جداول المرور والإشراف • دفتر الإدارة خلال العطلات', fn:'renderSupervisionGovernanceCommittee', colors:['#4a148c','#7b1fa2'] },
       { icon:'🔍', title:'استعلامات', sub:'استعلام عن إجازة • إذن • بدل راحة • مأمورية • مبادلة', fn:'renderDutyInquiryHub', colors:['#00695c','#00897b'] },
       { icon:'🗃️', title:'حوكمة الإجراءات والطلبات', sub:'استعلام عن تحرك الموظف ورصيد إجازاته', fn:'renderEmployeeMovementInquiry', colors:['#6d4c41','#8d6e63'] },
     ];
@@ -5978,13 +6069,57 @@ let USERS = {
 
   // ── تعريف الدفاتر خارج الدالة عشان يكون متاح دايماً ──
   const BOOKS = [
-    { key: 'admin_supervision', icon: '🗂️', label: 'وظائف الإدارة والإشراف',                        color: '#4e342e', light: '#f5efe8', textColor:'#f5efe8' },
-    { key: 'specialist',        icon: '⚕',  label: 'الوظائف التخصصية (طب بشري، صيدلة، اخصائي تمريض)', color: '#6a0572', light: '#f5e6f7', textColor:'#fff0fe' },
-    { key: 'technical',         icon: '🔬', label: 'الوظائف الفنية',                                  color: '#5c3a1a', light: '#fdf3e8', textColor:'#fdf3e8' },
-    { key: 'clerical',          icon: '🗃️', label: 'الوظائف الكتابية والخدمات المعاونة',              color: '#0077b6', light: '#e8f4fd', textColor:'#e8f4fd' },
-    { key: 'holiday',           icon: '🎉', label: 'العطلات الرسمية والأجازات',                       color: '#8a5d00', light: '#fffde7', textColor:'#fff9c4', isHoliday: true },
-    { key: 'evening_clinic',    icon: '🌆', label: 'العيادات المسائية',                                color: '#ff6b2b', light: '#fff3e0', textColor:'#fff3e0' },
+    { key: 'specialist',        icon: '⚕',  label: 'الوظائف التخصصية (طب بشري، صيدلة، اخصائي تمريض)', color: '#6a0572', light: '#f5e6f7', textColor:'#fff0fe', hub: true },
+    { key: 'technical',         icon: '🔬', label: 'الوظائف الفنية',                                  color: '#5c3a1a', light: '#fdf3e8', textColor:'#fdf3e8', hub: true },
+    { key: 'clerical',          icon: '🗃️', label: 'الوظائف الكتابية والخدمات المعاونة',              color: '#0077b6', light: '#e8f4fd', textColor:'#e8f4fd', hub: true },
+    { key: 'holiday',           icon: '🎉', label: 'دفتر العطلات والإجازات الرسمية',                  color: '#8a5d00', light: '#fffde7', textColor:'#fff9c4', isHoliday: true },
+    { key: 'admin_supervision', icon: '🗂️', label: 'دفتر الإدارة الإشرافية العليا',                   color: '#4e342e', light: '#f5efe8', textColor:'#f5efe8' },
   ];
+
+  // ── الأيقونة الوهمية للعيادات المسائية (تُستخدم داخل هَب "التخصصية" فقط، مش أيقونة مستقلة في الشاشة الرئيسية) ──
+  const _EVENING_CLINIC_BOOK = { key: 'evening_clinic', icon: '🌆', label: 'العيادات المسائية', color: '#ff6b2b', light: '#fff3e0', textColor:'#fff3e0' };
+
+  // ── تصنيف فرعي داخل كل دفتر رئيسي (الأطباء/الفنيين/الكتابيين) — تُستخدم لعرض أيقونات الدفاتر الفرعية ──
+  // كل مجموعة فرعية عبارة عن قائمة أسماء وظائف/تخصصات (كما تُخزَّن في category/dept) بالإضافة لدفتر "مجمّع" شامل
+  const SUBBOOK_GROUPS = {
+    specialist: [
+      { key: 'doctors',    sectionKey:'sub_specialist_doctors',    icon:'👨‍⚕️', label:'الأطباء البشري',
+        depts: ['الباطنه','الكلي الصناعي','عنايه عامه','عنايه قلب','عنايه عصبيه','عنايه باطنه','استقبال باطنة','الاطفال والمبتسرين','استقبال اطفال','النساء والتوليد','استقبال نساء','الجراحه العامه','استقبال جراحه عامه','العظام','استقبال عظام','التخدير','نواب التخدير','الاستقبال والطوارئ','استقبال الباطنه والكلي','باثولوجي اكلنيكي','مناظير','أطباء الاشعه','أطباء الأشعه'] },
+      { key: 'dentists',   sectionKey:'sub_specialist_dentists',   icon:'🦷', label:'أطباء الأسنان', note:'(عيادات مسائية)',
+        depts: ['اطباء اسنان'] },
+      { key: 'pharmacists',sectionKey:'sub_specialist_pharmacists',icon:'💊', label:'الصيادلة',
+        depts: ['صيدليه الطوارئ','صيدلية الاقتصادي','صيدليه الاقسام الداخليه','صيدليه المخدرات','صيدلية التامين الصحي','صيدلية العمليات','صيدلية التوريدات','صيدلية نفقة الدولة داخلي','صيدلية نفقة الدولة خارجي','صيدلية المجاني الخارجي','الكلي الصناعي صيدلية','الصيدليه الإكلينكيه','نائب الصيدلي الاول','مخزن الطعوم والامصال','مخزن مستلزمات العظام','مخزن المستهلك المجاني','مستلزمات تخصصيه قلب مفتوح','مخزن الادوية المجاني','مخزن الازمات والكوارث'] },
+      { key: 'physio',     sectionKey:'sub_specialist_physio',     icon:'🏃', label:'العلاج الطبيعي', note:'(عيادات مسائية)',
+        depts: ['العلاج الطبيعي'] },
+      { key: 'nursing_sp', sectionKey:'sub_specialist_nursing', icon:'👩‍⚕️', label:'أخصائي تمريض',
+        depts: ['اخصائي تمريض'] },
+    ],
+    technical: [
+      { key: 'tech_nursing',   sectionKey:'sub_technical_nursing',   icon:'💉', label:'فني تمريض',                depts:['فني تمريض'] },
+      { key: 'tech_lab',       sectionKey:'sub_technical_lab',       icon:'🧪', label:'فني معمل',                 depts:['فنيين معمل'] },
+      { key: 'tech_dental',    sectionKey:'sub_technical_dental',    icon:'🦷', label:'فني أسنان',                depts:['فنيين اسنان'] },
+      { key: 'tech_bloodbank', sectionKey:'sub_technical_bloodbank', icon:'🩸', label:'فني بنك دم',               depts:['فنيين بنك دم'] },
+      { key: 'tech_radiology', sectionKey:'sub_technical_radiology', icon:'🩻', label:'فني أشعة (رنين مغناطيسي + عادي)', depts:['فنيين اشعه'] },
+      { key: 'tech_emergency', sectionKey:'sub_technical_emergency', icon:'🚑', label:'فني خدمات طبية عاجلة (خدمات الطوارئ)', depts:['فني خدمات طبيه','فني تمريض خدمات طبية عاجلة'] },
+      { key: 'tech_maint',     sectionKey:'sub_technical_maint',     icon:'🛠️', label:'فني صيانة أجهزة طبية',     depts:['فني اجهزة طبية','فنيين هندسه'] },
+      { key: 'tech_records',   sectionKey:'sub_technical_records',   icon:'🗂️', label:'فني تسجيل طبي وإحصاء (مكتب الدخول والتسجيل)', depts:['فنيين تسجيل طبي','تسجيل اليكتروني','خدمات مكتب الدخول'] },
+    ],
+    clerical: [
+      { key: 'treasury', sectionKey:'sub_clerical_treasury', icon:'💰', label:'أعمال الخزنة',  depts:['اداري الخزينه'] },
+      { key: 'switch',   sectionKey:'sub_clerical_switch',   icon:'☎️', label:'السويتش',       depts:['اداري السويتش'] },
+      { key: 'workers',  sectionKey:'sub_clerical_workers',  icon:'🧹', label:'العمال',         depts:['العمال'] },
+    ],
+  };
+
+  // بيانات الفرعي بتُحدَّد بقائمة أسماء صريحة؛ أي قسم مصنَّف على الدفتر الرئيسي وغير موجود في أي قائمة فرعية أعلاه
+  // يظهر تلقائياً في دفتر "أخرى" الفرعي بنفس المجموعة (حتى لو كان اسم قسم جديد أُضيف لاحقاً) بدل ما يضيع
+  function _subbookOthers(topKey) {
+    const used = new Set();
+    (SUBBOOK_GROUPS[topKey] || []).forEach(g => g.depts.forEach(d => used.add(d)));
+    return used;
+  }
+  const _SUBBOOK_OTHERS_ICON = { specialist:'➕', technical:'🔧', clerical:'📎' };
+  const _SUBBOOK_OTHERS_LABEL = { specialist:'وظائف تخصصية أخرى', technical:'وظائف فنية أخرى', clerical:'خدمات معاونة أخرى' };
 
   // ── تصنيف نوبتجية العطلة: دفتر واحد موحّد لكل العطلات الرسمية والأجازات ──
   function classifyHolidayShift(s) {
@@ -6257,7 +6392,12 @@ let USERS = {
           // للعطلات: نعرض القسم الحقيقي (row.dept) وليس اسم العيد
           const deptKey   = String(row.dept || shift.category||shift.dept||'').replace(/^🎉\s*/,'').trim() || String(shift.category||shift.dept||'').replace(/^🎉\s*/,'').trim();
 
-          if (targetDept && deptKey !== targetDept) return;
+          // ── فلتر القسم: يدعم قسم واحد (نص) أو عدة أقسام مجتمعة (مصفوفة) ──
+          if (targetDept) {
+            if (Array.isArray(targetDept)) {
+              if (targetDept.length && !targetDept.includes(deptKey)) return;
+            } else if (deptKey !== targetDept) return;
+          }
 
           const dayKey    = rowDay !== null ? String(rowDay) : rowDate;
           const dedupeKey = nameClean+'|'+deptKey+'|'+dayKey+'|'+shiftTypeVal;
@@ -6341,9 +6481,8 @@ let USERS = {
             : '';
           rowsHtml += `<tr style="background:${rowNum%2===0?bookMeta.light:'white'}">
             <td style="border:1px solid #bbb;padding:7px 5px;text-align:center;font-size:0.92rem;font-weight:800">${rowNum}</td>
-            <td style="border:1px solid #bbb;padding:7px 5px;text-align:center;font-size:0.92rem;font-weight:800;color:#0077b6">${r.dayNum !== null ? r.dayNum : '—'}</td>
-            <td style="border:1px solid #bbb;padding:7px 8px;font-size:0.9rem;font-weight:800;color:#1a1a2e;text-align:center">${r.category}</td>
             <td style="border:1px solid #bbb;padding:7px 8px;font-weight:900;font-size:0.95rem;text-align:center"><div style="display:flex;align-items:center;justify-content:center;gap:6px">${adminEditBtn}<span class="staff-name-cell">${r.staff}</span></div></td>
+            <td style="border:1px solid #bbb;padding:7px 8px;font-size:0.9rem;font-weight:800;color:#1a1a2e;text-align:center">${r.category}</td>
             <td style="border:1px solid #bbb;padding:2px 1px;text-align:center"><input type="text" style="width:100%;min-width:70px;border:0;outline:0;background:transparent;text-align:center;font-family:inherit;font-size:0.88rem;font-weight:700;box-shadow:none;appearance:none;-webkit-appearance:none" placeholder=""></td>
             <td style="border:1px solid #bbb;padding:2px 1px;text-align:center"><input type="text" style="width:100%;min-width:70px;border:0;outline:0;background:transparent;text-align:center;font-family:inherit;font-size:0.88rem;font-weight:700;box-shadow:none;appearance:none;-webkit-appearance:none" placeholder=""></td>
             <td style="border:1px solid #bbb;padding:7px 8px;font-size:0.88rem">${r.notes||''}</td>
@@ -6376,22 +6515,21 @@ let USERS = {
               </div>
             </div>
             <div style="overflow-x:auto">
-              <table style="width:100%;border-collapse:collapse;font-size:0.92rem;margin:0 auto">
+              <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:0.92rem;margin:0 auto">
                 <thead>
                   <tr style="background:linear-gradient(135deg,${bookMeta.color},${hdrBg});color:#fff">
-                    <th style="border:1px solid #aaa;padding:9px 6px;text-align:center;width:38px;font-size:0.95rem">م</th>
-                    <th style="border:1px solid #aaa;padding:9px 6px;text-align:center;width:48px;font-size:0.95rem">اليوم</th>
-                    <th style="border:1px solid #aaa;padding:9px 8px;min-width:130px;font-size:0.95rem;text-align:center">القسم / التخصص</th>
-                    <th style="border:1px solid #aaa;padding:9px 8px;font-size:0.95rem;text-align:center">اسم النوبتجي</th>
-                    <th style="border:1px solid #aaa;padding:9px 6px;text-align:center;min-width:75px;font-size:0.95rem">حضور</th>
-                    <th style="border:1px solid #aaa;padding:9px 6px;text-align:center;min-width:75px;font-size:0.95rem">انصراف</th>
-                    <th style="border:1px solid #aaa;padding:9px 8px;font-size:0.95rem">ملاحظات (استدعاء - مبادلات - متابعة)</th>
+                    <th style="border:1px solid #aaa;padding:9px 6px;text-align:center;width:5%;font-size:0.95rem">م</th>
+                    <th style="border:1px solid #aaa;padding:9px 8px;width:31.5%;font-size:0.95rem;text-align:center">الاسم</th>
+                    <th style="border:1px solid #aaa;padding:9px 8px;width:10.5%;font-size:0.95rem;text-align:center">الوظيفة / التخصص</th>
+                    <th style="border:1px solid #aaa;padding:9px 6px;text-align:center;width:10.5%;font-size:0.95rem">حضور</th>
+                    <th style="border:1px solid #aaa;padding:9px 6px;text-align:center;width:10.5%;font-size:0.95rem">انصراف</th>
+                    <th style="border:1px solid #aaa;padding:9px 8px;width:31.5%;font-size:0.95rem;text-align:center">ملاحظات لجنة الإشراف والحوكمة</th>
                   </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>
                 <tfoot>
                   <tr style="background:#fff3cd">
-                    <td colspan="7" style="border:1px solid #aaa;padding:8px 16px;font-weight:900;font-size:0.95rem;text-align:center">
+                    <td colspan="6" style="border:1px solid #aaa;padding:8px 16px;font-weight:900;font-size:0.95rem;text-align:center">
                       خاص بمسئول الإشراف: &nbsp;&nbsp; القوة الإجمالية: <b>${rowNum}</b> &nbsp;&nbsp;
                       الحضور الفعلي: ____________ &nbsp;&nbsp; غياب: ____________ &nbsp;&nbsp; ترك عمل: ____________
                     </td>
@@ -6495,8 +6633,15 @@ let USERS = {
           pendingShifts = [];
         }
       } else {
-        bookShifts    = shifts.filter(s => classifyShift(s) === bookMeta.key && s.status === 'approved');
-        pendingShifts = shifts.filter(s => classifyShift(s) === bookMeta.key && ['pending_supervisor','pending_final','draft'].includes(s.status));
+        const _includeKeys = bookMeta.includeKeys || [bookMeta.key];
+        const _matchBook = (s) => _includeKeys.includes(classifyShift(s));
+        const _matchSub = (s) => {
+          if (bookMeta.deptFilter) return bookMeta.deptFilter.includes((s.category||s.dept||'').trim());
+          if (bookMeta.excludeDepts) return !bookMeta.excludeDepts.includes((s.category||s.dept||'').trim());
+          return true;
+        };
+        bookShifts    = shifts.filter(s => _matchBook(s) && _matchSub(s) && s.status === 'approved');
+        pendingShifts = shifts.filter(s => _matchBook(s) && _matchSub(s) && ['pending_supervisor','pending_final','draft'].includes(s.status));
       }
 
       function applyFilter() {
@@ -6504,10 +6649,11 @@ let USERS = {
         const month      = document.getElementById('sb_month_filter')?.value || '';
         const year       = document.getElementById('sb_year_filter')?.value  || '';
         const shiftTypeF = document.getElementById('sb_shifttype_filter')?.value || '';
-        const deptF      = document.getElementById('sb_dept_filter')?.value || '';
+        // ── فلتر الأقسام: يدعم اختيار قسمين أو ثلاثة أو أكثر معاً (مصفوفة) ──
+        const deptFArr   = window._sbGetSelectedDepts ? window._sbGetSelectedDepts() : [];
 
-        if (!exactDate && !month && !year && !shiftTypeF && !deptF) {
-          alert('الرجاء اختيار تاريخ أو شهر أو سنة أو نوع النوبة أو القسم للبحث'); return;
+        if (!exactDate && !month && !year && !shiftTypeF && !deptFArr.length) {
+          alert('الرجاء اختيار تاريخ أو شهر أو سنة أو نوع النوبة أو قسم واحد على الأقل للبحث'); return;
         }
 
         let targetDay = null, filterMonth = month, filterYear = year;
@@ -6547,9 +6693,10 @@ let USERS = {
         let lbl = exactDate
           ? ('يوم '+targetDay+' '+(mn[filterMonth]||filterMonth)+' '+filterYear+(stLbl?' — '+stLbl:''))
           : ((filterMonth?mn[filterMonth.padStart(2,'0')]+' ':'')+( filterYear||'كل الفترات')+(stLbl?' — '+stLbl:''));
-        if (deptF) lbl += ' — 🏥 '+deptF;
+        if (deptFArr.length === 1) lbl += ' — 🏥 '+deptFArr[0];
+        else if (deptFArr.length > 1) lbl += ' — 🏥 '+deptFArr.length+' أقسام ('+deptFArr.join('، ')+')';
 
-        document.getElementById('sbContent').innerHTML = buildUnifiedDailyTable(filtered, bookMeta, targetDay, deptF);
+        document.getElementById('sbContent').innerHTML = buildUnifiedDailyTable(filtered, bookMeta, targetDay, deptFArr);
 
         const trs = document.getElementById('sbContent')?.querySelectorAll('tbody tr') || [];
         const cnt = [...trs].filter(tr => !tr.querySelector('td[colspan]')).length;
@@ -6560,12 +6707,16 @@ let USERS = {
       }
 
       function clearFilter() {
-        ['sb_date_filter','sb_month_filter','sb_year_filter','sb_shifttype_filter','sb_dept_filter'].forEach(id => {
+        ['sb_date_filter','sb_month_filter','sb_year_filter','sb_shifttype_filter'].forEach(id => {
           const el=document.getElementById(id); if(el) el.value='';
         });
+        document.querySelectorAll('.sb_dept_chk').forEach(c => c.checked = false);
+        if (window._sbUpdateDeptLabel) window._sbUpdateDeptLabel();
+        const dd = document.getElementById('sb_dept_filter_dropdown');
+        if (dd) dd.style.display = 'none';
         const lEl=document.getElementById('sbFilterLabel');
         if(lEl) lEl.textContent='';
-        document.getElementById('sbContent').innerHTML = buildUnifiedDailyTable(bookShifts, bookMeta, null, '');
+        document.getElementById('sbContent').innerHTML = buildUnifiedDailyTable(bookShifts, bookMeta, null, []);
       }
 
       // ── نافذة الطباعة الذكية ──────────────────────────────────────────────
@@ -6630,7 +6781,7 @@ let USERS = {
             clone.querySelectorAll('.noprint').forEach(el => el.remove());
             clone.querySelectorAll('input').forEach(inp => {
               const span = document.createElement('span');
-              span.style.cssText = 'display:inline-block;min-width:55px;border-bottom:1px solid #888';
+              span.style.cssText = 'display:inline-block;min-width:55px';
               span.innerHTML = '&nbsp;';
               inp.replaceWith(span);
             });
@@ -6809,9 +6960,32 @@ ${body}
         });
         return [...set].sort((a,b) => a.localeCompare(b,'ar'));
       }
-      const deptOpts = _collectBookDepts(bookShifts).map(d =>
-        `<option value="${d.replace(/"/g,'&quot;')}">${d}</option>`
-      ).join('');
+      // ── قائمة اختيار الأقسام (متعددة): تشيك بوكس لكل قسم + تحديد الكل/إلغاء الكل ──
+      const _bookDeptsList = _collectBookDepts(bookShifts);
+      const deptCheckboxes = _bookDeptsList.length
+        ? _bookDeptsList.map(d => {
+            const safe = d.replace(/"/g,'&quot;');
+            return `<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f2f2f2;cursor:pointer;font-size:0.85rem;font-weight:700;color:#1a1a2e">
+              <input type="checkbox" class="sb_dept_chk" value="${safe}" onchange="window._sbUpdateDeptLabel()" style="width:16px;height:16px;accent-color:${bookMeta.color};flex-shrink:0">
+              <span>${d}</span>
+            </label>`;
+          }).join('')
+        : `<div style="padding:14px;text-align:center;color:#999;font-size:0.82rem">لا توجد أقسام مسجلة بعد في هذا الدفتر</div>`;
+
+      // ── شرائح فلتر سريعة للفروع (لو الدفتر ده جزء من هَب: تخصصية/فنية/كتابية) ──
+      let _chipsHtml = '';
+      if (bookMeta.backHub) {
+        const _tk = bookMeta.backHub;
+        const _subs = (SUBBOOK_GROUPS[_tk] || []).map(g => ({ key: g.key, icon: g.icon, label: g.label, action: `window._openSubBook('${_tk}','${g.key}')` }));
+        if (_tk === 'specialist') _subs.push({ key:'evening_clinic', icon:_EVENING_CLINIC_BOOK.icon, label:_EVENING_CLINIC_BOOK.label, action:`window._openSubBook('specialist','evening_clinic')` });
+        _subs.push({ key:'_others', icon:_SUBBOOK_OTHERS_ICON[_tk]||'➕', label:_SUBBOOK_OTHERS_LABEL[_tk]||'أخرى', action:`window._openSubBook('${_tk}','_others')` });
+        _subs.push({ key:'_aggregate', icon:'📚', label:'الكل (مجمّع)', action:`window._openSubBook('${_tk}','_aggregate')` });
+        const _activeKey = bookMeta.subKey || '_aggregate';
+        _chipsHtml = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">` + _subs.map(s => {
+          const active = s.key === _activeKey;
+          return `<span onclick="${s.action}" style="cursor:pointer;border-radius:20px;padding:4px 12px;font-size:0.76rem;font-weight:800;border:2px solid ${bookMeta.color};background:${active?bookMeta.color:'#fff'};color:${active?'#fff':bookMeta.color}">${s.icon} ${s.label}</span>`;
+        }).join('') + `</div>`;
+      }
 
       showModal(`
         <div class="section-header">
@@ -6823,6 +6997,11 @@ ${body}
             </span>
             ${pendingShifts.length > 0 ? `<span style="font-size:0.7rem;background:#e74c3c;color:white;border-radius:20px;padding:3px 12px;font-weight:700;animation:pulse_badge 1.5s infinite">⏳ ${pendingShifts.length} بانتظار الاعتماد</span>` : ''}
           </h2>
+          ${bookMeta.backHub ? `<div style="font-size:0.8rem;margin-top:4px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+              <span onclick="window.renderShiftBook()" style="cursor:pointer;text-decoration:underline;color:${bookMeta.color}">◀ رجوع لدفاتر النوبتجيات</span>
+              ${bookMeta.sectionKey ? `<span onclick="window.showUnifiedSetupScreen('${bookMeta.sectionKey}','${(bookMeta.addTitle||('نوبتجية '+bookMeta.label)).replace(/'/g,"\\'")}')" style="cursor:pointer;background:${bookMeta.color};color:white;border-radius:20px;padding:4px 14px;font-weight:800;font-size:0.78rem">➕ إضافة نوبتجية جديدة لهذا الفرع فقط</span>` : ''}
+            </div>
+            ${_chipsHtml}` : ''}
         </div>
 
         ${pendingShifts.length > 0 ? `
@@ -6911,12 +7090,20 @@ ${body}
               </select>
             </div>
 
-            <div style="display:flex;flex-direction:column;gap:4px">
-              <label style="font-size:0.8rem;font-weight:900;color:#555">🏥 القسم</label>
-              <select id="sb_dept_filter" style="padding:9px 10px;border:2px solid ${bookMeta.color};border-radius:10px;font-family:inherit;font-weight:700;font-size:0.84rem;background:white;color:#1a1a2e">
-                <option value="">🔄 كل الأقسام</option>
-                ${deptOpts}
-              </select>
+            <div style="display:flex;flex-direction:column;gap:4px;position:relative">
+              <label style="font-size:0.8rem;font-weight:900;color:#555">🏥 الأقسام (يمكن اختيار قسمين أو ثلاثة أو أكثر معاً)</label>
+              <div id="sb_dept_filter_btn" onclick="window._sbToggleDeptDropdown(event)"
+                style="padding:9px 10px;border:2px solid ${bookMeta.color};border-radius:10px;font-family:inherit;font-weight:700;font-size:0.84rem;background:white;color:#1a1a2e;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:6px">
+                <span id="sb_dept_filter_label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔄 كل الأقسام</span>
+                <span style="font-size:0.7rem;flex-shrink:0">▼</span>
+              </div>
+              <div id="sb_dept_filter_dropdown" style="display:none;position:absolute;top:100%;right:0;left:0;z-index:60;background:white;border:2px solid ${bookMeta.color};border-radius:10px;margin-top:4px;max-height:260px;overflow-y:auto;box-shadow:0 8px 22px rgba(0,0,0,0.25)">
+                <div style="display:flex;gap:6px;padding:8px;border-bottom:1px solid #eee;position:sticky;top:0;background:white">
+                  <button type="button" onclick="window._sbSelectAllDepts()" style="flex:1;padding:5px;background:${bookMeta.color};color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:800;cursor:pointer">✅ تحديد الكل</button>
+                  <button type="button" onclick="window._sbClearAllDepts()" style="flex:1;padding:5px;background:#eee;color:#555;border:none;border-radius:6px;font-size:0.72rem;font-weight:800;cursor:pointer">✖ إلغاء الكل</button>
+                </div>
+                ${deptCheckboxes}
+              </div>
             </div>
 
             <div style="display:flex;gap:7px;align-items:flex-end">
@@ -6937,6 +7124,43 @@ ${body}
       window._sbApplyFilter = applyFilter;
       window._sbClearFilter = clearFilter;
       window._sbPrint       = printBook;
+
+      // ── منطق قائمة اختيار الأقسام المتعددة (تشيك بوكس) ──────────────────
+      window._sbToggleDeptDropdown = function(e) {
+        if (e) e.stopPropagation();
+        const dd = document.getElementById('sb_dept_filter_dropdown');
+        if (dd) dd.style.display = (dd.style.display === 'none' || !dd.style.display) ? 'block' : 'none';
+      };
+      window._sbSelectAllDepts = function() {
+        document.querySelectorAll('.sb_dept_chk').forEach(c => c.checked = true);
+        window._sbUpdateDeptLabel();
+      };
+      window._sbClearAllDepts = function() {
+        document.querySelectorAll('.sb_dept_chk').forEach(c => c.checked = false);
+        window._sbUpdateDeptLabel();
+      };
+      window._sbGetSelectedDepts = function() {
+        return [...document.querySelectorAll('.sb_dept_chk:checked')].map(c => c.value);
+      };
+      window._sbUpdateDeptLabel = function() {
+        const sel = window._sbGetSelectedDepts();
+        const lbl = document.getElementById('sb_dept_filter_label');
+        if (!lbl) return;
+        if (!sel.length) lbl.textContent = '🔄 كل الأقسام';
+        else if (sel.length <= 2) lbl.textContent = '🏥 ' + sel.join(' + ');
+        else lbl.textContent = `🏥 ${sel.length} أقسام محددة`;
+      };
+      // إغلاق القائمة عند الضغط خارجها (مُسجَّل مرة واحدة فقط مهما تكرر فتح الدفاتر)
+      if (!window._sbDeptDropdownOutsideClickBound) {
+        window._sbDeptDropdownOutsideClickBound = true;
+        document.addEventListener('click', function(e) {
+          const dd  = document.getElementById('sb_dept_filter_dropdown');
+          const btn = document.getElementById('sb_dept_filter_btn');
+          if (!dd || dd.style.display === 'none') return;
+          if (dd.contains(e.target) || (btn && btn.contains(e.target))) return;
+          dd.style.display = 'none';
+        });
+      }
       window._sbPDF = async function() {
         const pdfContent = document.getElementById('sbContent')?.innerHTML || '';
         showToast('⏳ جاري إنشاء ملف PDF...');
@@ -6972,14 +7196,14 @@ ${body}
       };
       window._sbExcel = function() {
         let csv='\uFEFF';
-        csv+='م,القسم/التخصص,اسم النوبتجي,حضور,انصراف,ملاحظات\n';
+        csv+='م,الاسم,الوظيفة/التخصص,حضور,انصراف,ملاحظات لجنة الإشراف والحوكمة\n';
         let n=0;
         bookShifts.forEach(shift=>{
           if(!shift.data) return;
           shift.data.forEach(row=>{
             n++;
             const e=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
-            csv+=[n,e(shift.category||''),e(row.staff||''),e(row.attendance||''),e(row.departure||''),e(row.notes||'')].join(',')+'\n';
+            csv+=[n,e(row.staff||''),e(shift.category||''),e(row.attendance||''),e(row.departure||''),e(row.notes||'')].join(',')+'\n';
           });
         });
         const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
@@ -7202,7 +7426,7 @@ ${body}
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;padding:10px 0 20px">
-        ${BOOKS.filter(b => b.key !== 'admin_supervision').map(b => {
+        ${BOOKS.map(b => {
           const isPending_id = 'pending_' + b.key + '_' + Date.now();
           return `
           <div onclick="window._openBook('${b.key}')"
@@ -7320,7 +7544,72 @@ ${body}
     })();
 
     // ربط أحداث الكاردات — async لأن openBookModal أصبح async
-    window._openBook = async (key) => { try { const bk = BOOKS.find(x=>x.key===key); if(bk) await openBookModal(bk); } catch(e) { showToast("⚠️ خطأ: " + e.message); console.error(e); } };
+    window._openBook = async (key) => {
+      try {
+        const bk = BOOKS.find(x=>x.key===key);
+        if (!bk) return;
+        if (key === 'admin_supervision') { window.renderSupervisionGovernanceCommittee(); return; }
+        if (bk.hub) { await window._openSubBook(key, '_aggregate'); return; }
+        await openBookModal(bk);
+      } catch(e) { showToast("⚠️ خطأ: " + e.message); console.error(e); }
+    };
+
+    // ── شاشة اختيار الدفتر الفرعي (تُعرض عند فتح دفتر رئيسي مقسّم: تخصصية/فنية/كتابية) ──
+    async function openBookHub(topBook) {
+      const subs = (SUBBOOK_GROUPS[topBook.key] || []).slice();
+      const othersKey = _subbookOthers(topBook.key);
+      const tiles = subs.map(g => ({
+        icon: g.icon, label: g.label + (g.note ? ` <small style="font-weight:700;font-size:0.72rem;opacity:0.85">${g.note}</small>` : ''),
+        onclick: `window._openSubBook('${topBook.key}','${g.key}')`
+      }));
+      if (topBook.key === 'specialist') {
+        tiles.push({ icon: _EVENING_CLINIC_BOOK.icon, label: _EVENING_CLINIC_BOOK.label, onclick: `window._openSubBook('specialist','evening_clinic')` });
+      }
+      tiles.push({ icon: _SUBBOOK_OTHERS_ICON[topBook.key] || '➕', label: _SUBBOOK_OTHERS_LABEL[topBook.key] || 'أخرى', onclick: `window._openSubBook('${topBook.key}','_others')` });
+      tiles.push({ icon: '📚', label: `دفتر مجمّع ${topBook.label}`, onclick: `window._openSubBook('${topBook.key}','_aggregate')` });
+
+      showModal(`
+        <div class="section-header">
+          <h2>${topBook.icon} ${topBook.label}</h2>
+          <div style="font-size:0.82rem;color:#555"><span onclick="window.renderShiftBook()" style="cursor:pointer;text-decoration:underline">◀ رجوع لدفاتر النوبتجيات</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;padding:10px 0 20px">
+          ${tiles.map(t => `
+            <div onclick="${t.onclick}"
+              style="cursor:pointer;border:3px solid ${topBook.color};border-radius:16px;background:${topBook.light};padding:20px 14px;text-align:center;transition:transform 0.15s"
+              onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
+              <div style="font-size:2.3rem;margin-bottom:6px">${t.icon}</div>
+              <div style="font-weight:900;color:${topBook.color};font-size:0.92rem;line-height:1.3">${t.label}</div>
+            </div>
+          `).join('')}
+        </div>
+      `);
+    }
+
+    window._openSubBook = async (topKey, subKey) => {
+      try {
+        const topBook = BOOKS.find(x=>x.key===topKey);
+        if (!topBook) return;
+        if (subKey === 'evening_clinic') {
+          await openBookModal({ ..._EVENING_CLINIC_BOOK, backHub: topKey, subKey, sectionKey: 'doctors_pharmacy_clinic', addTitle: '🌆 نوبتجيات العيادات المسائية' });
+          return;
+        }
+        if (subKey === '_aggregate') {
+          const includeKeys = (topKey === 'specialist') ? ['specialist','evening_clinic'] : [topKey];
+          await openBookModal({ ...topBook, label: `دفتر مجمّع ${topBook.label}`, includeKeys, backHub: topKey, subKey });
+          return;
+        }
+        if (subKey === '_others') {
+          const used = _subbookOthers(topKey);
+          await openBookModal({ ...topBook, label: (_SUBBOOK_OTHERS_LABEL[topKey]||'أخرى') + ' — ' + topBook.label, excludeDepts: [...used], backHub: topKey, subKey });
+          return;
+        }
+        const g = (SUBBOOK_GROUPS[topKey]||[]).find(x=>x.key===subKey);
+        if (!g) return;
+        await openBookModal({ ...topBook, label: g.label + ' — ' + topBook.label, deptFilter: g.depts, backHub: topKey, subKey, sectionKey: g.sectionKey, addTitle: g.icon + ' نوبتجيات ' + g.label });
+      } catch(e) { showToast("⚠️ خطأ: " + e.message); console.error(e); }
+    };
+    window.openBookHub = openBookHub;
   };
 
 // ==================== القسم 10: خدمات عامة ====================
