@@ -450,7 +450,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -6007,96 +6007,40 @@ let USERS = {
   };
   
   window.showAddUser = function() {
-    const depts = Object.keys(DOCTORS_DATA);
     document.getElementById('addUserForm').innerHTML = `
-      <div style="background:#f0f8ff;border:2px solid #0077b6;border-radius:15px;padding:18px;margin:15px 0">
-        <h3 style="color:#0077b6;margin-bottom:15px;font-weight:900">➕ إضافة مستخدم جديد</h3>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
-          <div><label style="font-size:0.8rem;font-weight:900;display:block;margin-bottom:4px">👤 الاسم الكامل</label>
-            <input id="nu_name" placeholder="الاسم الكامل" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-family:inherit;font-weight:700"></div>
-          <div><label style="font-size:0.8rem;font-weight:900;display:block;margin-bottom:4px">🔒 كلمة المرور</label>
-            <input id="nu_pass" placeholder="كلمة المرور" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-family:inherit;font-weight:700"></div>
-          <div><label style="font-size:0.8rem;font-weight:900;display:block;margin-bottom:4px">📋 نوع الحساب</label>
-            <select id="nu_type" style="width:100%;padding:10px;border-radius:10px;font-family:inherit">
-              <option value="user">موظف (User)</option>
-              <option value="supervisor">رئيس قسم</option>
-              <option value="dutymanager">مدير مناوب</option>
-              <option value="supermanager">مدير المستشفى</option>
-              <option value="viewer">مشاهد (Viewer)</option>
-            </select></div>
-          <div><label style="font-size:0.8rem;font-weight:900;display:block;margin-bottom:4px">🏥 القسم</label>
-            <select id="nu_dept" style="width:100%;padding:10px;border-radius:10px;font-family:inherit">
-              <option value="all">جميع الأقسام</option>${depts.map(d => `<option value="${d}">${d}</option>`).join('')}
-            </select></div>
-        </div>
-        <div style="margin-top:12px;display:flex;gap:10px">
-          <button class="btn-save" onclick="addNewUser()">💾 إضافة المستخدم</button>
-          <button style="padding:10px 22px;background:#e76f51;color:white;border:none;border-radius:40px;cursor:pointer;font-weight:900" onclick="document.getElementById('addUserForm').innerHTML=''">✕ إلغاء</button>
-        </div>
+      <div style="background:#fff3f3;border:2px solid #c0392b;border-radius:15px;padding:18px;margin:15px 0">
+        <h3 style="color:#c0392b;margin-bottom:10px;font-weight:900">⚠️ تم تعطيل الإضافة المباشرة من هنا</h3>
+        <p style="color:#555;font-weight:700;line-height:1.7">
+          الصلاحيات الحقيقية بقت بتتحدد عبر Firebase Authentication (custom claims) مش من الكود المحلي،
+          فأي إضافة من هنا هتدّي انطباع كاذب إن الحساب اتعمل وهو مش هيقدر يدخل فعليًا.<br>
+          برجاء إضافة المستخدم الجديد عن طريق سكريبت التسجيل المخصص، بعدها إضافته للقائمة الأساسية في الكود.
+        </p>
+        <button style="margin-top:10px;padding:10px 22px;background:#1a1a2e;color:#e6b800;border:none;border-radius:40px;cursor:pointer;font-weight:900" onclick="document.getElementById('addUserForm').innerHTML=''">إغلاق</button>
       </div>
     `;
   };
   
   window.addNewUser = async function() {
-    const name = document.getElementById('nu_name')?.value.trim();
-    const pass = document.getElementById('nu_pass')?.value.trim();
-    const type = document.getElementById('nu_type')?.value;
-    const dept = document.getElementById('nu_dept')?.value;
-    if (!name || !pass) { alert('أدخل الاسم وكلمة المرور'); return; }
-    const passwordHash = await sha256Hex(pass);
-    USERS[name] = { passwordHash, type, dept };
-    try { await setDoc(doc(db, 'users', name), { name, passwordHash, type, dept, createdAt: serverTimestamp() }); } catch(e) {}
-    await saveAuditLog('إضافة مستخدم', 'تم إضافة: ' + name + ' | النوع: ' + type + ' | القسم: ' + dept);
-    showToast('✅ تم إضافة المستخدم');
-    renderUsersManagement();
+    showToast('⛔ الإضافة المباشرة معطّلة - استخدم سكريبت التسجيل');
   };
 
   window.editUserFull = function(name) {
-    const u = USERS[name];
-    if (!u) return;
-    const depts = Object.keys(DOCTORS_DATA);
-    const isAdmin = u.type === 'admin';
     document.getElementById('addUserForm').innerHTML = `
-      <div style="background:#fff8e1;border:2px solid #e6b800;border-radius:15px;padding:18px;margin:15px 0">
-        <h3 style="color:#1a1a2e;margin-bottom:15px;font-weight:900">✏️ تعديل بيانات: ${name}</h3>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
-          <div><label style="font-size:0.8rem;font-weight:900;display:block;margin-bottom:4px">🔒 تغيير كلمة المرور (اتركه فارغًا لعدم التغيير)</label>
-            <input id="eu_pass" value="" placeholder="اكتب كلمة مرور جديدة فقط لو تريد تغييرها" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-family:inherit;font-weight:700"></div>
-          ${!isAdmin ? `<div><label style="font-size:0.8rem;font-weight:900;display:block;margin-bottom:4px">📋 نوع الحساب</label>
-            <select id="eu_type" style="width:100%;padding:10px;border-radius:10px;font-family:inherit">
-              <option value="user" ${u.type==='user'?'selected':''}>موظف (User)</option>
-              <option value="supervisor" ${u.type==='supervisor'?'selected':''}>رئيس قسم</option>
-              <option value="dutymanager" ${u.type==='dutymanager'?'selected':''}>مدير مناوب</option>
-              <option value="supermanager" ${u.type==='supermanager'?'selected':''}>مدير المستشفى</option>
-              <option value="viewer" ${u.type==='viewer'?'selected':''}>مشاهد (Viewer)</option>
-            </select></div>
-          <div><label style="font-size:0.8rem;font-weight:900;display:block;margin-bottom:4px">🏥 القسم</label>
-            <select id="eu_dept" style="width:100%;padding:10px;border-radius:10px;font-family:inherit">
-              <option value="all" ${u.dept==='all'?'selected':''}>جميع الأقسام</option>${depts.map(d => `<option value="${d}" ${u.dept===d?'selected':''}>${d}</option>`).join('')}
-            </select></div>` : ''}
-        </div>
-        <div style="margin-top:12px;display:flex;gap:10px">
-          <button class="btn-save" onclick="saveUserEdit('${name}', ${isAdmin})">💾 حفظ التعديلات</button>
-          <button style="padding:10px 22px;background:#636e72;color:white;border:none;border-radius:40px;cursor:pointer;font-weight:900" onclick="document.getElementById('addUserForm').innerHTML=''">✕ إلغاء</button>
-        </div>
+      <div style="background:#fff3f3;border:2px solid #c0392b;border-radius:15px;padding:18px;margin:15px 0">
+        <h3 style="color:#c0392b;margin-bottom:10px;font-weight:900">⚠️ تم تعطيل التعديل المباشر من هنا: ${name}</h3>
+        <p style="color:#555;font-weight:700;line-height:1.7">
+          الصلاحيات الحقيقية (النوع/الدور) بقت بتتحدد عبر custom claims في Firebase Authentication مش من الكود المحلي،
+          وتغيير كلمة المرور من هنا مش هيحدّث كلمة المرور الحقيقية المستخدمة في تسجيل الدخول.<br>
+          برجاء تعديل بيانات المستخدم عن طريق سكريبت الإدارة المخصص.
+        </p>
+        <button style="margin-top:10px;padding:10px 22px;background:#1a1a2e;color:#e6b800;border:none;border-radius:40px;cursor:pointer;font-weight:900" onclick="document.getElementById('addUserForm').innerHTML=''">إغلاق</button>
       </div>
     `;
     document.getElementById('addUserForm').scrollIntoView({behavior:'smooth'});
   };
 
   window.saveUserEdit = async function(name, isAdmin) {
-    const u = USERS[name];
-    if (!u) return;
-    const pass = document.getElementById('eu_pass')?.value.trim();
-    if (pass) { u.passwordHash = await sha256Hex(pass); }
-    if (!isAdmin) {
-      u.type = document.getElementById('eu_type')?.value || u.type;
-      u.dept = document.getElementById('eu_dept')?.value || u.dept;
-    }
-    try { await setDoc(doc(db, 'users', name), { name, passwordHash: u.passwordHash, type: u.type, dept: u.dept }); } catch(e) {}
-    await saveAuditLog('تعديل مستخدم', 'تم تعديل: ' + name + ' | النوع: ' + u.type + ' | القسم: ' + u.dept + (pass ? ' | تم تغيير كلمة المرور' : ''));
-    showToast('✅ تم حفظ التعديلات');
-    renderUsersManagement();
+    showToast('⛔ التعديل المباشر معطّل - استخدم سكريبت الإدارة');
   };
   
   window.editUser = function(name) {
@@ -8927,7 +8871,7 @@ window.editEmpCard = function(idx) {
       usersSnap.forEach(docSnap => {
         const d = docSnap.data();
         if (d.name) {
-          USERS[d.name] = { passwordHash: d.passwordHash, type: d.type, dept: d.dept, supervisor: d.supervisor || null };
+          USERS[d.name] = { passwordHash: d.passwordHash, type: d.type, dept: d.dept, supervisor: d.supervisor || null, code: d.code || USERS[d.name]?.code };
         }
       });
     } catch(e) { console.log('users load error:', e); }
@@ -8937,6 +8881,25 @@ window.editEmpCard = function(idx) {
     const enteredHash = password ? await sha256Hex(password) : '';
     if (user.passwordHash !== enteredHash) { document.getElementById('loginError').textContent = 'كلمة المرور غير صحيحة'; document.getElementById('loginError').style.display = 'block'; setTimeout(() => document.getElementById('loginError').style.display = 'none', 3000); return; }
     if (user.type !== userType) { document.getElementById('loginError').textContent = 'نوع المستخدم غير مطابق لبياناتك'; document.getElementById('loginError').style.display = 'block'; setTimeout(() => document.getElementById('loginError').style.display = 'none', 3000); return; }
+
+    // ── تسجيل دخول حقيقي في Firebase Authentication (مطلوب لتفعيل الصلاحيات عبر custom claims) ──
+    if (!user.code) {
+      document.getElementById('loginError').textContent = 'الحساب غير مرتبط بنظام الحماية الجديد - تواصل مع الأدمن';
+      document.getElementById('loginError').style.display = 'block';
+      setTimeout(() => document.getElementById('loginError').style.display = 'none', 4000);
+      return;
+    }
+    const syntheticEmail = `emp${user.code}@manfalut-hospital.local`;
+    try {
+      await signInWithEmailAndPassword(auth, syntheticEmail, password);
+    } catch (authErr) {
+      console.error('Firebase Auth sign-in failed:', authErr);
+      document.getElementById('loginError').textContent = 'تعذر التحقق من الحساب في نظام الحماية - تواصل مع الأدمن';
+      document.getElementById('loginError').style.display = 'block';
+      setTimeout(() => document.getElementById('loginError').style.display = 'none', 4000);
+      return;
+    }
+
     currentUser = username;
     currentUserData = user;
 
@@ -8992,8 +8955,9 @@ window.editEmpCard = function(idx) {
     }
   };
 
-  window.doLogout = function() {
+  window.doLogout = async function() {
     if (unsubscribeNotif) unsubscribeNotif();
+    try { await signOut(auth); } catch (e) { console.error('Firebase signOut failed:', e); }
     currentUser = null;
     currentUserData = null;
     document.getElementById('dashboard').style.display = 'none';
@@ -9003,6 +8967,7 @@ window.editEmpCard = function(idx) {
     const _sbBtn = document.getElementById('sidebarToggleBtn'); if (_sbBtn) _sbBtn.classList.remove('visible');
     document.body.classList.remove('has-admin-sidebar');
     if (typeof closeSidebar === 'function') closeSidebar();
+    signInAnonymously(auth).catch(err => console.error('فشل إعادة تسجيل الدخول المجهول:', err));
   };
   
   const ICON_STYLES = [
