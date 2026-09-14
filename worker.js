@@ -1,11 +1,17 @@
 ﻿// ================== إعدادات ==================
 const SYSTEM_ROUTES = {
-  'sys1': 'الخدمات_العاجله_والحوكمه_محدث.html',
-  'sys2': 'نظام_الموارد_البشرية_محدث.html',
-  'sys3': 'نظام_النوبتجيات_محدث.html',
-  'sys4': 'الحوكمة_الادارية_والاكلينيكية_محدث.html',
-  'sys5': 'الترددات_والاشغال_محدث.html',
+  'sys1': { file: 'الخدمات_العاجله_والحوكمه_محدث.html', roles: ['admin', 'supermanager'] },
+  'sys2': { file: 'نظام_الموارد_البشرية_محدث.html', roles: ['admin', 'supermanager', 'dutymanager'] },
+  'sys3': { file: 'نظام_النوبتجيات_محدث.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor'] },
+  'sys4': { file: 'الحوكمة_الادارية_والاكلينيكية_محدث.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor', 'viewer', 'user'] },
+  'sys5': { file: 'الترددات_والاشغال_محدث.html', roles: ['admin', 'supermanager', 'dutymanager'] },
+  'sys6': { file: 'التحول_الرقمي_وتحليل_البيانات.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor', 'viewer', 'user'] },
 };
+
+// المتعاقدين يرثون افتراضيًا نفس صلاحيات الموظف العادي (user) — نفس القاعدة المطبقة في البوابة
+function effectiveRole(type) {
+  return type === 'متعاقد' ? 'user' : type;
+}
 
 const COOKIE_NAME = 'gw_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 ساعات
@@ -140,7 +146,7 @@ export default {
     }
 
     // ----- روابط الأنظمة المباشرة: /open/sys1 .. /open/sys5 (محمية بتسجيل دخول) -----
-    const m = url.pathname.match(/^\/open\/(sys[1-5])\/?$/);
+    const m = url.pathname.match(/^\/open\/(sys[1-6])\/?$/);
     if (m) {
       const cookieToken = getCookie(request, COOKIE_NAME);
       const session = await verifySession(cookieToken, env.AUTH_SECRET);
@@ -152,9 +158,19 @@ export default {
         });
       }
 
-      const filename = SYSTEM_ROUTES[m[1]];
-      if (!filename) return new Response('غير موجود', { status: 404 });
-      const assetUrl = new URL('/' + encodeURIComponent(filename), url.origin);
+      const route = SYSTEM_ROUTES[m[1]];
+      if (!route) return new Response('غير موجود', { status: 404 });
+
+      // admin بيعدي دايمًا، وأي دور تاني لازم يكون موجود في قايمة الأدوار المسموح لها بهذا النظام
+      const role = effectiveRole(session.type);
+      if (role !== 'admin' && !route.roles.includes(role)) {
+        return new Response('⛔ لا تملك صلاحية الدخول لهذا النظام', {
+          status: 403,
+          headers: { 'Content-Type': 'text/html; charset=UTF-8' }
+        });
+      }
+
+      const assetUrl = new URL('/' + encodeURIComponent(route.file), url.origin);
       return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
     }
 
