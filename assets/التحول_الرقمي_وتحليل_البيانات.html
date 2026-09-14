@@ -2329,6 +2329,16 @@ function statusBadgeClass(s){
   if(s.includes('منتدب') || s.includes('اعارة')) return 'seconded';
   return 'other';
 }
+/* تحويل حالة طلب الحوكمة (approved/rejected/pending القادمة من الجسر المشترك)
+   إلى نفس شكل الشارة الملونة بالعربي المستخدم في باقي الأنظمة، بدل عرض القيمة
+   الخام كما هي. */
+function govRequestStatusLabel(s){
+  const v = String(s||'').trim().toLowerCase();
+  if(v === 'approved' || v === 'منفذ' || v === 'معتمد') return { label: 'منفذ / معتمد ✅', cls: 'ok' };
+  if(v === 'rejected' || v === 'مرفوض') return { label: 'مرفوض ❌', cls: 'other' };
+  if(v === 'pending' || v === 'قيد الموافقة' || v === '') return { label: 'قيد الموافقة ⏳', cls: 'warn' };
+  return { label: esc(s), cls: 'other' };
+}
 function esc(v){
   if(v===null||v===undefined||v==='') return '—';
   return String(v);
@@ -4493,13 +4503,22 @@ function syncApprovalToBridge_(req, status, rejectReason){
    عشان "طلباتي" وشاشة الاعتمادات تبقوا موحّدين بين كل الأجهزة، مش بس عن طريق شيت طلبات_مشتركة. */
 const FS_GOV_REQUESTS_COLLECTION = 'gov_requests_v6';
 
-function firestoreSaveGovRequest(req){
+/* تحفظ نسخة الطلب المحلية في فايربيز الخاص بهذا النظام. لو المحاولة الأولى فشلت
+   (انقطاع مؤقت في الشبكة غالبًا) بنعيد المحاولة مرتين تانيين بفاصل بسيط قبل ما
+   نعرض رسالة الفشل النهائية للمستخدم — عشان الرسالة متظهرش على مشاكل مؤقتة
+   بتتحل لوحدها، وتفضل مقتصرة على فشل حقيقي ومستمر. */
+function firestoreSaveGovRequest(req, attempt){
   if(!window.db || !req || req.id == null) return;
+  attempt = attempt || 1;
   window.authReady.then(function(){
     return window.db.collection(FS_GOV_REQUESTS_COLLECTION).doc(String(req.id)).set(req);
   }).catch(function(e){
-    console.error('فشل حفظ طلب الخدمات على فايربيز', e);
-    if(typeof toast === 'function') toast('تم الحفظ محليًا، لكن تعذّرت المزامنة مع فايربيز', true);
+    console.error('فشل حفظ طلب الخدمات على فايربيز (محاولة ' + attempt + ')', e);
+    if(attempt < 3){
+      setTimeout(function(){ firestoreSaveGovRequest(req, attempt + 1); }, 1500 * attempt);
+    } else if(typeof toast === 'function') {
+      toast('تم الحفظ محليًا، لكن تعذّرت المزامنة مع فايربيز بعد عدة محاولات', true);
+    }
   });
 }
 
@@ -4994,7 +5013,8 @@ document.getElementById('govBridgeSearch').addEventListener('input', function(){
       });
       box.innerHTML = Object.keys(byName).map(function(name){
         const rows = byName[name].map(function(it){
-          return `<tr><td>${it.date||''}</td><td>${it.type||''}</td><td>${it.details||''}</td><td>${it.status||''}</td><td>${it.source||''}</td></tr>`;
+          const st = govRequestStatusLabel(it.status);
+          return `<tr><td>${it.date||''}</td><td>${it.type||''}</td><td>${it.details||''}</td><td><span class="badge ${st.cls}">${st.label}</span></td><td>${it.source||''}</td></tr>`;
         }).join('');
         return `<h3 style="margin:10px 0 6px;color:var(--gold-bright);">${name}</h3>
           <div class="table-wrap"><div class="table-scroll">
