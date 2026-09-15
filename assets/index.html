@@ -4135,6 +4135,30 @@ document.addEventListener('click', function (e) {
   if (box && !e.target.closest('.login-group')) box.classList.remove('show');
 });
 
+// بعد نجاح تسجيل الدخول محليًا، بنظبط جلسة الـ Worker (كوكي gw_session)
+// عشان فتح الأنظمة عن طريق /open/sysN يشتغل من غير ما يرجع لنسخة GitHub الاحتياطية.
+// الـ Worker مش هيقبل الجلسة دي إلا لو نفس الاسم/الباسورد موجودين في جدول users بقاعدة D1.
+async function ensureGatewaySession(name, password) {
+  // لو الملف شغال محليًا (file://) مفيش worker أصلاً يتصل بيه
+  if (location.protocol === 'file:') return false;
+  try {
+    const fd = new FormData();
+    fd.append('name', name);
+    fd.append('password', password);
+    const res = await fetch('/gw-login?next=' + encodeURIComponent('/'), {
+      method: 'POST',
+      body: fd,
+      redirect: 'manual'
+    });
+    // الـ Worker بيرجع 302 (redirect) لما تسجيل الدخول ينجح ويظبط الكوكي — fetch بيشوفها opaqueredirect
+    // ولو الباسورد غلط أو المستخدم مش موجود في D1 بيرجع 401 عادي من غير ريدايركت
+    return (res.type === 'opaqueredirect' || res.status === 0);
+  } catch (e) {
+    console.warn('تعذر تسجيل الدخول لجلسة الـ Worker (gw_session):', e);
+    return false;
+  }
+}
+
 async function doLogin() {
   const name = document.getElementById('userSel').value;
   const pass = document.getElementById('passIn').value;
@@ -4156,6 +4180,11 @@ async function doLogin() {
   document.getElementById('navRole').textContent = TYPE_LABELS[u.type] || u.type;
   document.getElementById('greetName').textContent = name;
   buildGrid();
+
+  const gwOk = await ensureGatewaySession(name, pass);
+  if (!gwOk && location.protocol !== 'file:' && typeof showToast === 'function') {
+    showToast('⚠️ جلسة السيرفر (Worker) لم تُفعّل لحساب "' + name + '" — فتح الأنظمة هيعتمد على نسخة GitHub الاحتياطية لحد ما يتظبط الحساب في قاعدة بيانات D1');
+  }
 }
 
 function doLogout() {
