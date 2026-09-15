@@ -4950,6 +4950,73 @@ document.getElementById('infoModal').addEventListener('click', function(e) {
 });
 
 
+// ===== احتياطي: لو /open/sysN من الـ Worker رجّع صفحة خطأ أو فشل تحميله، نجيب نسخة النظام مباشرة من GitHub =====
+// (نفس الـ repo/branch المستخدمين أصلاً لجلب تاريخ "آخر تحديث" لكل نظام - GH_OWNER/GH_REPO/GH_BRANCH)
+function buildGithubRawUrl(ghFile) {
+  return `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${encodeURIComponent(ghFile)}`;
+}
+
+function looksLikeBrokenSystemPage(doc) {
+  if (!doc || !doc.body) return true;
+  const text = (doc.body.innerText || '').trim();
+  if (text.length < 40) return true; // صفحة شبه فاضية
+  const markers = [
+    'moved, edited, or deleted',
+    'it may have been moved',
+    'file not found',
+    'not found',
+    '404',
+    'الملف غير موجود',
+    'الصفحة غير موجودة'
+  ];
+  const lower = text.toLowerCase();
+  return markers.some(m => lower.includes(m.toLowerCase()));
+}
+
+function attachSystemFrameFallback(frame, sysEntry) {
+  if (!sysEntry || !sysEntry.ghFile) return;
+
+  // لو الـ iframe اتستخدم قبل كده لفتح نظام تاني، نشيل الـ listeners القديمة الأول
+  if (frame._sysFallbackCleanup) frame._sysFallbackCleanup();
+
+  let settled = false;
+
+  const doFallback = function(reason) {
+    if (settled || frame.dataset.fallbackUsed === '1') return;
+    settled = true;
+    frame.dataset.fallbackUsed = '1';
+    console.warn('فتح النظام من الـ Worker فشل (' + reason + ') — جاري تحميل نسخة احتياطية من GitHub لملف:', sysEntry.ghFile);
+    if (typeof showToast === 'function') {
+      showToast('⚠️ تعذر تحميل النظام من الخادم — تم عرض نسخة احتياطية (قد لا تكون محدثة بالكامل)');
+    }
+    frame.src = buildGithubRawUrl(sysEntry.ghFile);
+  };
+
+  const onError = function() { doFallback('error event'); };
+  const onLoad = function() {
+    if (frame.dataset.fallbackUsed === '1') return; // دي تحميلة النسخة الاحتياطية نفسها
+    try {
+      const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+      if (looksLikeBrokenSystemPage(doc)) doFallback('broken content detected');
+    } catch (e) {
+      // Cross-origin أو تعذر القراءة - مفيش داعي نعتبرها خطأ، سيبها زي ما هي
+    }
+  };
+  const timerId = setTimeout(function() {
+    if (!settled && frame.dataset.fallbackUsed !== '1') doFallback('timeout');
+  }, 9000);
+
+  frame.addEventListener('error', onError);
+  frame.addEventListener('load', onLoad);
+
+  frame._sysFallbackCleanup = function() {
+    frame.removeEventListener('error', onError);
+    frame.removeEventListener('load', onLoad);
+    clearTimeout(timerId);
+    frame._sysFallbackCleanup = null;
+  };
+}
+
 async function openSystem(filename) {
   // فتح الأنظمة بقى بيتم عن طريق البوابة المحمية في الـ Worker (/open/sysN)
   // مربوطة بجلسة تسجيل دخول (كوكي HttpOnly) وقاعدة بيانات D1، بدل الاعتماد على نسخة مضمّنة داخل البوابة
@@ -4960,7 +5027,10 @@ async function openSystem(filename) {
     return;
   }
 
-  const targetUrl = '/open/' + sysEntry.route;
+  // لو الملف شغال محليًا من على الجهاز (file://) مفيش Worker ولا كوكي هيشتغلوا،
+  // فبنفتح نسخة الملف المحلية اللي جنب index.html مباشرة (لازم يكون بنفس اسم ghFile بالظبط)
+  const isLocalFile = (location.protocol === 'file:');
+  const targetUrl = isLocalFile ? sysEntry.ghFile : ('/open/' + sysEntry.route);
 
   // إنشاء overlay يملأ الشاشة بالكامل
   let overlay = document.getElementById('__sysOverlay__');
@@ -5008,11 +5078,16 @@ async function openSystem(filename) {
     overlay.appendChild(frame);
 
     document.body.appendChild(overlay);
+    attachSystemFrameFallback(frame, sysEntry);
   } else {
     // لو الـ overlay موجود مسبقاً، حدّث الرابط
     overlay.style.display = 'flex';
     const frame = overlay.querySelector('iframe');
-    if (frame) frame.src = targetUrl;
+    if (frame) {
+      frame.dataset.fallbackUsed = '';
+      frame.src = targetUrl;
+      attachSystemFrameFallback(frame, sysEntry);
+    }
   }
 }
 
