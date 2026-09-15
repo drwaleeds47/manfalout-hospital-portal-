@@ -171,7 +171,12 @@ export default {
       }
 
       const assetUrl = new URL('/' + encodeURIComponent(route.file), url.origin);
-      return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+      const assetResponse = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+      // private (مش public) عشان الكاش يكون في متصفح المستخدم نفسه بس، مش على أي شير كاش وسيط
+      // 30 دقيقة كفاية تسرّع فتح نفس النظام تاني قريب، من غير ما تأخر ظهور تعديل جديد لمدة طويلة
+      const response = new Response(assetResponse.body, assetResponse);
+      response.headers.set('Cache-Control', 'private, max-age=1800');
+      return response;
     }
 
     // ----- باقي الطلبات (index.html والبوابة المجمعة) زي ما هي -----
