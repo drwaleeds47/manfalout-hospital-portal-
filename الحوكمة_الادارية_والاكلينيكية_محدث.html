@@ -6523,7 +6523,7 @@ async function saveManagementRoundReport(subject, category, roleTitle='') {
         if (currentUser?.role==='viewer') { showToast('⚠️ وضع المشاهدة: لا يمكنك حفظ تقرير'); return; }
         if (!auth.currentUser) { showToast('❌ جلسة Firebase غير مفعلة — أعد تسجيل الدخول'); return; }
         const isEdit=!!managementRoundEditingKey;
-        if(isEdit && currentUser?.role!=='admin' && payload.createdBy!==currentUser?.name){showToast('🔒 يمكنك تعديل تقاريرك فقط أو من خلال الأدمن');return;}
+        if(isEdit && currentUser?.role!=='admin'){showToast('🔒 تعديل تقرير محفوظ بالفعل متاح للأدمن فقط الآن — يمكنك حفظ تقرير جديد بدلاً من ذلك');return;}
         const existingRound=roundsReportsCache.find(x=>x.key===managementRoundEditingKey);
         try {
             if(isEdit){
@@ -9789,7 +9789,7 @@ async function saveRoundReport(){
             return;
         }
         const isEdit=!!roundEditingKey;
-        if(isEdit && currentUser?.role!=='admin' && payload.createdBy!==currentUser?.name){ showToast('🔒 يمكنك تعديل تقاريرك فقط أو من خلال الأدمن'); return; }
+        if(isEdit && currentUser?.role!=='admin'){ showToast('🔒 تعديل تقرير محفوظ بالفعل متاح للأدمن فقط الآن — يمكنك حفظ تقرير جديد بدلاً من ذلك'); return; }
         const existingRound=roundsReportsCache.find(x=>x.key===roundEditingKey);
         try {
             if(isEdit){
@@ -9831,7 +9831,7 @@ let roundsReportsCache=[];
 let roundEditingKey=null;
 let managementRoundEditingKey=null;
 function canEditRoundReport(r){
-    return currentUser?.role==='admin' || r?.createdBy===currentUser?.name || r?.inspector===currentUser?.name;
+    return currentUser?.role==='admin';
 }
 function canDeleteRoundReport(r){ return currentUser?.role==='admin'; }
 function editRoundReport(key){
@@ -10034,7 +10034,7 @@ async function renderRoundsReports(){
             const approvalClass = r.approval ? 'status-ok' : '';
             return `<tr><td>${i+1}</td><td>${escapeHtml(r.department)}</td><td>${escapeHtml(r.templateName)}</td><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.inspector)}</td><td><span class="${bad?'status-bad':'status-ok'}">${bad?bad+' غير مطابق':'مطابق'}</span></td><td><span class="${approvalClass}" style="font-size:.82rem;">${escapeHtml(approvalText)}</span></td><td><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;">
 <button class="pg-btn" onclick="viewRoundReport('${r.key}')">عرض / اعتماد</button>
-<button class="pg-btn" style="background:#1565c0;color:#fff;" onclick="editRoundReport('${r.key}')">✏️ تعديل</button>
+${canEditRoundReport(r)?`<button class="pg-btn" style="background:#1565c0;color:#fff;" onclick="editRoundReport('${r.key}')">✏️ تعديل</button>`:''}
 <button class="pg-btn" style="background:#455a64;color:#fff;" onclick="printRoundReport('${r.key}',false)">🖨️ طباعة</button>
 <button class="pg-btn" style="background:#8e24aa;color:#fff;" onclick="printRoundReport('${r.key}',true)">📄 تحويل لـ PDF</button>
 ${canDeleteRoundReport(r)?`<button class="pg-btn" style="background:#c62828;color:#fff;" onclick="deleteRoundReport('${r.key}')">🗑️ حذف</button>`:''}
