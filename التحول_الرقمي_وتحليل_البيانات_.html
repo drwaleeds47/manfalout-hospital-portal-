@@ -362,9 +362,14 @@ footer b{color:#000; font-size:17px;}
 @media print{
   @page{ size:A4; margin:12mm; }
   html,body{margin:0 !important; padding:0 !important; background:#fff !important; overflow:visible !important;}
-  header.top,.toolbar,.tabs,.stats,footer,.table-wrap,.home-actions,.home-search-wrap,.home-hero,.bg-anim,.employee-actions,
+  header.top,.toolbar,.tabs,.tab-panel,.stats,footer,.table-wrap,.home-actions,.home-search-wrap,.home-hero,.bg-anim,.employee-actions,
+  #internalIdentityBanner,#loginGate,
   .modal-header,.modal-footer{display:none !important;}
-  .overlay{position:static !important; background:none !important; backdrop-filter:none !important; display:block !important; padding:0 !important; margin:0 !important;}
+  /* مهم: في الصفحة أكتر من overlay واحد (modalOverlay, formOverlay, reportOverlay, statementOverlay).
+     القاعدة القديمة كانت بتظهرهم كلهم وقت الطباعة حتى لو مقفولين، فبيطلع صفحات زيادة فاضية
+     (كان بيلزم اختيار الصفحة الصح يدويًا من بين 3). دلوقتي بنطبع الـ overlay المفتوح (.show) بس. */
+  .overlay{display:none !important;}
+  .overlay.show{position:static !important; background:none !important; backdrop-filter:none !important; display:block !important; padding:0 !important; margin:0 !important;}
   .modal{box-shadow:none !important; border:none !important; border-radius:0 !important; width:100% !important; max-width:100% !important; max-height:none !important; height:auto !important; overflow:visible !important; background:#fff !important; padding:0 !important; margin:0 !important;}
   .modal-body{padding:0 !important; height:auto !important;}
   #statementSheet{
@@ -372,9 +377,10 @@ footer b{color:#000; font-size:17px;}
     background:#fff !important; color:#000 !important;
     border:2.5px solid #000 !important; box-shadow:none !important; border-radius:0 !important;
     font-family:'Arial','Tahoma',sans-serif !important; padding:20px 32px !important;
-    width:100% !important; height:auto !important; max-height:none !important; box-sizing:border-box !important;
-    page-break-inside:avoid !important; break-inside:avoid !important;
+    width:100% !important; box-sizing:border-box !important; overflow:hidden !important;
     page-break-after:avoid !important; page-break-before:avoid !important;
+    /* نسبة التصغير الفعلية بتتحسب ديناميكيًا بالجافاسكريبت (fitStatementForPrint) حسب طول بيانات كل موظف،
+       بحد أقصى 95%، عشان تتأكد إن كل تفاصيل البيان في صفحة واحدة بالظبط من غير نقص ولا صفحة زيادة فاضية */
   }
   #statementSheet *{color:#000 !important; background:transparent !important; box-shadow:none !important;}
   #statementSheet .stmt-grid .row, #statementSheet .stmt-form-head, #statementSheet .sign-row,
@@ -397,6 +403,33 @@ footer b{color:#000; font-size:17px;}
   #statementSheet .sign-row{margin-top:18px !important; font-size:14.5px !important;}
   #statementSheet .stmt-credit{border-top:1.5px solid #000 !important; font-size:10px !important; margin-top:14px !important; padding-top:9px !important; line-height:1.6 !important;}
 }
+
+
+/* نسخة طباعية من مقاسات بيان الحالة، بس مفعّلة مؤقتًا على الشاشة (عبر body.stmt-print-mode)
+   عشان الجافاسكريبت يقدر يقيس الارتفاع الحقيقي قبل الطباعة ويحسب نسبة التصغير المناسبة تلقائيًا.
+   القيم هنا مطابقة تمامًا لنفس القيم الموجودة جوه @media print فوق. */
+body.stmt-print-mode #statementSheet{
+  display:flex; flex-direction:column;
+  background:#fff; color:#000;
+  border:2.5px solid #000; box-shadow:none; border-radius:0;
+  font-family:'Arial','Tahoma',sans-serif; padding:20px 32px;
+  width:186mm !important; max-width:186mm !important; height:auto; box-sizing:border-box;
+}
+body.stmt-print-mode #statementSheet *{color:#000; background:transparent; box-shadow:none;}
+body.stmt-print-mode .stmt-logo-box{border:2px solid #000; background:#fff; width:78px; height:78px;}
+body.stmt-print-mode .stmt-code-box{border:1.5px solid #000; margin:10px auto 10px; padding:5px 26px; font-size:14px;}
+body.stmt-print-mode #statementSheet h2.stmt-title{border:2.5px solid #000; background:#fff; margin:8px auto 16px; padding:8px 22px; font-size:19px; max-width:340px;}
+body.stmt-print-mode #statementSheet .stmt-form-head{margin-bottom:4px;}
+body.stmt-print-mode #statementSheet .sub-line{margin-bottom:10px; font-size:12px;}
+body.stmt-print-mode #statementSheet .stmt-org-text{font-size:13px; line-height:1.85;}
+body.stmt-print-mode #statementSheet .stmt-org-text b{font-size:15px;}
+body.stmt-print-mode #statementSheet .stmt-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px 24px; font-size:14.5px; margin-bottom:12px;}
+body.stmt-print-mode #statementSheet .stmt-grid .row{border-bottom:1px solid #000; padding-bottom:7px;}
+body.stmt-print-mode #statementSheet .stmt-grid .row.full{grid-column:1/-1;}
+body.stmt-print-mode #statementSheet .stmt-grid .row.notes-row b{font-size:11px; line-height:1.5; text-align:justify;}
+body.stmt-print-mode #statementSheet .stmt-note{border-top:1px solid #000; border-bottom:1px solid #000; margin:12px 0 10px; padding:9px 0; font-size:13px;}
+body.stmt-print-mode #statementSheet .sign-row{margin-top:18px; font-size:14.5px;}
+body.stmt-print-mode #statementSheet .stmt-credit{border-top:1.5px solid #000; font-size:10px; margin-top:14px; padding-top:9px; line-height:1.6;}
 
 
 /* ---------- Employee access card + actions ---------- */
@@ -1270,6 +1303,33 @@ footer b{
   #internalIdentityBanner .ib-org{right:10px;top:10px;min-width:0;width:44%;padding:6px 9px;font-size:10.5px;line-height:1.4;}
   #internalIdentityBanner .ib-org b{font-size:11px;}
   #internalIdentityBanner .ib-verse{max-width:96%;font-size:15px;padding:7px 12px;}
+}
+</style>
+
+<style id="print-sidebar-hard-fix">
+/* إصلاح نهائي وقوي: إخفاء الشريط الجانبي الملون (#sideNav) وكل عناصر التنقل عند الطباعة.
+   بيستخدم محددات ID عشان يضمن الأولوية فوق أي قاعدة تانية جوه الملف مهما كانت. */
+@media print{
+  #sideNav,
+  #statsGrid,
+  main.admin-sidebar-layout > .tabs,
+  header.top,
+  .toolbar,
+  .home-hero,
+  .home-actions,
+  #tab-home,
+  footer{
+    display:none !important;
+  }
+  .tab-panel:not(#statementOverlay):not(#statementOverlay *){
+    display:none !important;
+  }
+  main.admin-sidebar-layout{
+    display:block !important;
+  }
+  #statementOverlay.show{
+    display:block !important;
+  }
 }
 </style>
 </head>
@@ -2490,6 +2550,20 @@ function esc(v){
   if(v===null||v===undefined||v==='') return '—';
   return String(v);
 }
+/* تضمن ظهور قائمة الاقتراحات كاملة داخل الشاشة المرئية بدل أن تظهر خارج حدود الشاشة (خصوصاً على الموبايل
+   أو عندما يكون حقل البحث قريباً من أسفل الصفحة) */
+function ensureSuggestBoxVisible(box){
+  if(!box) return;
+  requestAnimationFrame(function(){
+    try{
+      var rect = box.getBoundingClientRect();
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      if(rect.bottom > vh || rect.top < 0){
+        box.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      }
+    }catch(e){}
+  });
+}
 
 
 
@@ -2631,6 +2705,7 @@ function renderNameSuggestions(query, sourceArr, nameKey, boxId){
   if(!matches.length){ box.classList.remove('show'); box.innerHTML=''; return; }
   box.innerHTML = matches.map(r=>`<div class="suggest-item" data-name="${esc(r[nameKey])}">${esc(r[nameKey])}</div>`).join('');
   box.classList.add('show');
+  ensureSuggestBoxVisible(box);
 }
 document.getElementById('searchMain').addEventListener('input', e=>{
   renderNameSuggestions(e.target.value.trim(), MAIN_DATA, 'الاسم', 'searchMainSuggest');
@@ -2772,6 +2847,7 @@ function renderSuggestions(query){
   if(!matches.length){
     box.innerHTML = '<div class="suggest-item">لا توجد نتائج</div>';
     box.classList.add('show');
+    ensureSuggestBoxVisible(box);
     return;
   }
   box.innerHTML = matches.map(r=>
@@ -2779,6 +2855,7 @@ function renderSuggestions(query){
        <span style="color:var(--text-faint); font-size:11px;">(${esc(r['كود الموظف'])})</span></div>`
   ).join('');
   box.classList.add('show');
+  ensureSuggestBoxVisible(box);
 }
 function updateSelectedTag(){
   const box = document.getElementById('selectedTagBox');
@@ -2946,8 +3023,50 @@ function openStatementSheet(code){
 function closeStatement(){ document.getElementById('statementOverlay').classList.remove('show'); }
 document.getElementById('statementCloseBtn').addEventListener('click', closeStatement);
 document.getElementById('statementCloseBtn2').addEventListener('click', closeStatement);
-document.getElementById('statementPrintBtn').addEventListener('click', ()=>window.print());
-document.getElementById('statementPdfBtn').addEventListener('click', ()=>window.print());
+
+/* ---------- تصغير بيان الحالة تلقائيًا ليتأكد إنه في صفحة A4 واحدة بالضبط ----------
+   بيانات بعض الموظفين (زي حقل "ملاحظات") ممكن تكون أطول من غيرها، فمقاس تصغير ثابت (95%)
+   ممكن يظل مش كافي أحيانًا ويطلع صفحة تانية فاضية (فيها بس آخر جزء من البيان زي الكريدت).
+   الحل: قبل الطباعة مباشرة، بنقيس الارتفاع الحقيقي للبيان (بنفس مقاسات الطباعة، عن طريق كلاس
+   body.stmt-print-mode) ونحسب نسبة التصغير المطلوبة فعليًا لتظبيطه في صفحة واحدة، بحد أقصى 95%. */
+function fitStatementForPrint(){
+  const sheet = document.getElementById('statementSheet');
+  if(!sheet || !sheet.innerHTML.trim()) return;
+  sheet.style.zoom = '';
+  sheet.style.transform = '';
+  sheet.style.transformOrigin = '';
+  sheet.style.height = '';
+  document.body.classList.add('stmt-print-mode');
+  const naturalHeightPx = sheet.scrollHeight;
+  document.body.classList.remove('stmt-print-mode');
+  if(!naturalHeightPx) return;
+  const pxPerMM = 96 / 25.4;
+  const pageMarginMM = 12; // نفس القيمة الموجودة في @page margin
+  const availablePx = (297 - pageMarginMM * 2) * pxPerMM * 0.97; // ارتفاع A4 القابل للطباعة + هامش أمان صغير
+  let scale = availablePx / naturalHeightPx;
+  if(scale > 0.95) scale = 0.95;   // مش أكبر من 95% حتى لو البيانات قصيرة
+  if(scale < 0.4) scale = 0.4;     // حد أدنى للقراءة في الحالات النادرة جدًا لبيانات طويلة جدًا
+  // استخدام transform بدل zoom لأن خاصية zoom مش موثوقة أثناء الطباعة في كل المتصفحات
+  // (بعضها بيتجاهلها تمامًا وقت حساب تقسيم الصفحات)، ولازم كمان نقلل ارتفاع العنصر
+  // (height) فعليًا بعد التصغير، عشان المساحة المحجوزة في الصفحة تتقلص فعلاً بدل ما
+  // تفضل بمقاسها الأصلي وتدفع آخر جزء (التوقيعات/الكريدت) لصفحة تانية منفصلة.
+  sheet.style.transformOrigin = 'top center';
+  sheet.style.transform = `scale(${scale})`;
+  sheet.style.height = (naturalHeightPx * scale) + 'px';
+}
+window.addEventListener('beforeprint', fitStatementForPrint);
+window.addEventListener('afterprint', function(){
+  const sheet = document.getElementById('statementSheet');
+  if(sheet){
+    sheet.style.zoom = '';
+    sheet.style.transform = '';
+    sheet.style.transformOrigin = '';
+    sheet.style.height = '';
+  }
+});
+
+document.getElementById('statementPrintBtn').addEventListener('click', ()=>{ fitStatementForPrint(); window.print(); });
+document.getElementById('statementPdfBtn').addEventListener('click', ()=>{ fitStatementForPrint(); window.print(); });
 function downloadBlob(content, mime, filename){
   const blob = new Blob(['\ufeff', content], {type: mime});
   const url = URL.createObjectURL(blob);
@@ -4294,6 +4413,7 @@ function renderContractSuggestions(query){
   if(!matches.length){
     box.innerHTML = '<div class="suggest-item">لا توجد نتائج</div>';
     box.classList.add('show');
+    ensureSuggestBoxVisible(box);
     return;
   }
   box.innerHTML = matches.map(r=>
@@ -4301,6 +4421,7 @@ function renderContractSuggestions(query){
        <span style="color:var(--text-faint); font-size:11px;">(${esc(r['كود الموظف'])})</span></div>`
   ).join('');
   box.classList.add('show');
+  ensureSuggestBoxVisible(box);
 }
 function updateSelectedContractTag(){
   const box = document.getElementById('selectedTagBoxContract');
@@ -5234,6 +5355,7 @@ function govBridgeRenderNamePills(source){
     return `<div class="gov-name-pill" data-name="${esc(name)}">${esc(name)}${count!==null ? `<span class="gov-name-pill-count">${count}</span>` : ''}</div>`;
   }).join('');
   suggest.classList.add('show');
+  ensureSuggestBoxVisible(suggest);
 }
 
 /* يحسب مدة الإجازة بالأيام من نص التفاصيل (نفس منطق سيستم الموارد البشرية) */
@@ -5436,6 +5558,7 @@ function renderGovStatusMainSuggestions(query){
   if(!matches.length){
     box.innerHTML = '<div class="suggest-item">لا توجد نتائج</div>';
     box.classList.add('show');
+    ensureSuggestBoxVisible(box);
     return;
   }
   box.innerHTML = matches.map(r=>
@@ -5443,6 +5566,7 @@ function renderGovStatusMainSuggestions(query){
        <span style="color:var(--text-faint); font-size:11px;">(${esc(r['كود الموظف'])})</span></div>`
   ).join('');
   box.classList.add('show');
+  ensureSuggestBoxVisible(box);
 }
 const govStatusMainSearchInp = document.getElementById('govStatusMainSearch');
 if(govStatusMainSearchInp){
@@ -5472,6 +5596,7 @@ function renderGovStatusContractSuggestions(query){
   if(!matches.length){
     box.innerHTML = '<div class="suggest-item">لا توجد نتائج</div>';
     box.classList.add('show');
+    ensureSuggestBoxVisible(box);
     return;
   }
   box.innerHTML = matches.map(r=>
@@ -5479,6 +5604,7 @@ function renderGovStatusContractSuggestions(query){
        <span style="color:var(--text-faint); font-size:11px;">(${esc(r['كود الموظف'])})</span></div>`
   ).join('');
   box.classList.add('show');
+  ensureSuggestBoxVisible(box);
 }
 const govStatusContractSearchInp = document.getElementById('govStatusContractSearch');
 if(govStatusContractSearchInp){
@@ -6282,6 +6408,7 @@ function renderSvcList(){
         '</div>';
       }).join('');
       box.classList.add('show');
+      ensureSuggestBoxVisible(box);
       if(field) field.classList.add('has-suggest');
     }
     input.addEventListener('input', showMatches);
@@ -6314,6 +6441,7 @@ function renderSvcList(){
       if(normSaved.toLowerCase().indexOf(normTyped.toLowerCase()) !== 0 || normSaved.toLowerCase() === normTyped.toLowerCase()){ hide(); return; }
       box.innerHTML = '<div class="suggest-item" data-val="'+saved.replace(/"/g,'&quot;')+'">'+saved+'</div>';
       box.classList.add('show');
+      ensureSuggestBoxVisible(box);
       if(field) field.classList.add('has-suggest');
     }
     input.addEventListener('input', showSuggestion);
