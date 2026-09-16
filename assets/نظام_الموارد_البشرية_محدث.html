@@ -4824,7 +4824,9 @@ window.renderEmbeddedHRSheet = function(kind, backFn, navHtml) {
     if (kind === 'contracts') {
       mine = data.filter(r => pfMatchScore(r[1], currentUser));
     } else {
-      mine = data.filter(r => String(r[0]) === String(myCode));
+      // مطابقة القوة البشرية بالاسم (وليس الكود) — الكود يُستخدم فقط لتسجيل الدخول
+      const myNameNorm = pfNormalizeName(currentUser);
+      mine = data.filter(r => pfNormalizeName(r[1]) === myNameNorm);
     }
     bodyHtml = mine.length
       ? mine.map(r => window._hrRenderRecordCard(kind, r)).join('')
