@@ -7,7 +7,34 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-@media print { .noprint { display:none!important; } }
+@media print {
+  .noprint,
+  #adminSidebar,
+  #sidebarToggleBtn,
+  #sidebarOverlay,
+  .top-nav,
+  .section-header,
+  button[onclick*="window.print()"],
+  #mainPage > .quran-verse { display:none!important; }
+  #mainPage { display:none!important; min-height:0!important; }
+  #loginPage { display:none!important; min-height:0!important; }
+  body.has-admin-sidebar { padding-left:0!important; }
+  #appModal, #choiceModal {
+    position:static!important;
+    background:none!important;
+    padding-left:0!important;
+    overflow:visible!important;
+    inset:auto!important;
+  }
+  .modal-container {
+    max-height:none!important; margin:0!important; width:auto!important; max-width:none!important;
+    background:none!important; border:none!important; border-radius:0!important; box-shadow:none!important;
+  }
+  .modal-body { padding:0!important; }
+  body { background:#fff!important; min-height:0!important; }
+  .stmt-sheet { margin:0 auto!important; }
+  @page { margin:8mm; }
+}
 body {
   font-family:'Tajawal','Cairo',sans-serif;
   background: url('https://i.postimg.cc/kXVvqYft/file-000000003dd481f4b77f004271a8593b.png') center/cover fixed;
@@ -465,6 +492,85 @@ select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(230
 .hospital-name span{display:block!important;font-size:1rem!important;font-weight:800!important;color:var(--gold)!important;line-height:1.5!important;text-align:justify!important;text-align-last:justify!important;-moz-text-align-last:justify!important;}
 .signature{display:inline-flex!important;flex-direction:column!important;align-items:stretch!important;}
 #mainPage .signature>div{font-weight:900!important;color:var(--dark)!important;font-size:1rem!important;text-align:justify!important;text-align-last:justify!important;-moz-text-align-last:justify!important;}
+
+/* ============================================================
+   بيان الحالة الوظيفية — تصميم "النسر" الموحد (مطابق لنظام التحول الرقمي)
+   خلفية بيضاء + شعار جمهورية مصر العربية كعلامة مائية + إطار أسود
+   ============================================================ */
+.stmt-sheet{
+  position:relative;
+  background-color:#fff;
+  color:#000000; border-radius:0; padding:18px 14px; font-family:'Arial','Tahoma',sans-serif;
+  border:2.5px solid #000; box-shadow:none; max-width:800px; margin:20px auto; overflow:hidden;
+  direction:rtl; text-align:center;
+}
+.stmt-sheet > *{ position:relative; z-index:1; }
+.stmt-sheet > .stmt-watermark{
+  position:absolute; inset:0; z-index:0; display:flex; align-items:center; justify-content:center;
+  pointer-events:none; overflow:hidden;
+}
+.stmt-sheet > .stmt-watermark img{
+  width:66%; max-width:380px; max-height:80%; object-fit:contain; opacity:.22;
+  -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important;
+}
+.stmt-form-head{display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:6px;}
+.stmt-logo-box{
+  width:96px; height:96px; border-radius:50%; border:2px solid #122a46;
+  box-shadow: inset 0 0 0 3px #000;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; background:#fff;
+}
+.stmt-logo-box-lg{ width:132px; height:132px; }
+.stmt-org-text{text-align:center; font-size:16px; line-height:1.9; color:#000; font-weight:700;}
+.stmt-org-text b{display:block; text-align:center; color:#000; font-size:16px; font-weight:700;}
+.stmt-code-badge-mid{
+  align-self:center; flex-shrink:0; background:#6a0dad; color:#fff; border:2px solid #000;
+  border-radius:999px; padding:8px 18px; font-size:18px; font-weight:900; white-space:nowrap;
+}
+.stmt-sheet h2.stmt-title{
+  font-family:'Arial','Tahoma',sans-serif; text-align:center; font-size:19px; margin:10px auto 20px; font-weight:900;
+  border:3px solid #000; border-radius:10px; padding:10px 22px; max-width:600px;
+  background:#ffe14d; color:#000;
+}
+.stmt-sheet .stmt-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px 26px; font-size:17px; margin-bottom:20px;}
+.stmt-sheet .stmt-grid .row{
+  display:grid; grid-template-columns:max-content 1fr; align-items:baseline; gap:10px;
+  border-bottom:1px solid #000; padding-bottom:8px; color:#000; font-weight:700; text-align:right;
+}
+.stmt-sheet .stmt-grid .row.full{grid-column:1/-1;}
+.stmt-sheet .stmt-grid .row span{ text-align:right; white-space:nowrap; font-weight:900; }
+.stmt-sheet .stmt-grid .row b{color:#000; font-weight:600; text-align:center;}
+.stmt-sheet .stmt-grid .row.notes-row b{font-size:13px; line-height:1.6; text-align:justify;}
+.stmt-sheet .stmt-note{
+  text-align:right; font-size:15px; color:#000; font-weight:900; margin:16px 0 12px;
+  border-top:1px solid #000; border-bottom:1px solid #000; padding:12px 0;
+}
+.stmt-sheet .stmt-note-line{ margin-bottom:5px; }
+.stmt-sheet .stmt-dots{ border-bottom:1.5px dotted #000; height:22px; max-width:100%; margin:0; }
+.stmt-sheet .sign-row{display:flex; justify-content:space-between; gap:10px; margin-top:30px; font-size:15px; font-weight:900; color:#000;}
+.stmt-sheet .sign-row .sign-col{flex:1 1 0%; text-align:center;}
+.stmt-sheet .sign-dots-row{display:flex; justify-content:space-between; gap:14px; margin-top:14px;}
+.stmt-sheet .sign-dots-row .sign-dots{flex:1 1 0%; border-bottom:1.5px dotted #000; height:1em;}
+.stmt-sheet .stmt-credit{
+  margin-top:16px; padding-top:10px; border-top:1.5px solid #b8860b;
+  text-align:center; font-family:'Cairo', sans-serif;
+  display:flex; justify-content:center; padding-inline:4px; box-sizing:border-box;
+}
+.stmt-sheet .stmt-credit .credit-pill{
+  display:block; background:#ffe14d; color:#000; border:2px solid #000;
+  border-radius:16px; padding:6px 12px; font-size:11px; font-weight:800;
+  letter-spacing:0; line-height:1.35; text-align:center; max-width:calc(100% - 4px); margin:0 2px;
+}
+@media print{
+  .stmt-sheet{ border:2.5px solid #000 !important; max-width:100%!important; }
+  .stmt-sheet > .stmt-watermark{ display:flex !important; visibility:visible !important; }
+  .stmt-sheet > .stmt-watermark img{
+    display:block !important; visibility:visible !important; opacity:.4 !important; filter:none !important;
+    -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important;
+  }
+  .stmt-sheet .stmt-credit .credit-pill{ font-size:10px!important; line-height:1.25!important; white-space:nowrap!important; padding:5px 8px!important; }
+  .stmt-sheet .stmt-credit{ margin-top:12px!important; padding-top:8px!important; }
+}
+
 </style>
 </head>
 <body>
@@ -5200,43 +5306,97 @@ window.addAttachToEmp = async function(code) {
 };
 
 
-// ====================== قالب موحد: تذييل علوي وسفلي لبيان الحالة الوظيفية ======================
-window.renderOfficialLetterhead = function(code) {
+// ====================== قالب موحد "النسر" لبيان الحالة الوظيفية (مطابق لتصميم نظام التحول الرقمي) ======================
+window._STMT_EMBLEM_URL = 'https://i.postimg.cc/vB1vPPgH/file-000000000f2c8210a7afcd2ef9fe049b.png';
+window._STMT_EMBLEM_FALLBACK = 'https://i.postimg.cc/vB1vPPgH/file-000000000f2c8210a7afcd2ef9fe049b.png';
+
+/* ---------- تصنيف كود فئة الموظف (يُحسب تلقائيًا حسب نوع الوظيفة) — مطابق لنظام التحول الرقمي
+   الوظائف التخصصية = 001  (اطباء بشري A / اسنان B / صيادلة C / علاج طبيعي D / اخصائي تمريض E)
+   الوظائف الفنية    = 002  (تمريض N / معمل A / بنك دم B / تسجيل طبي واحصاء C / أشعة وتصوير R / خدمات طبية E / فني تغذية H / فني اسنان F)
+   الوظائف الكتابية وخدمات معاونة = كود موحد G003 */
+window.classifyEmployeeCategory = function(mainGroup, subGroup, jobTitle) {
+  mainGroup = String(mainGroup || '').trim();
+  subGroup  = String(subGroup || '').trim();
+  jobTitle  = String(jobTitle || '').trim();
+
+  if (mainGroup === 'الوظائف المكتبية' || mainGroup === 'وظائف الخدمات المعاونة') {
+    return 'G003';
+  }
+  // اخصائي التمريض العالي يُصنف ضمن الوظائف التخصصية بكود E حسب المطلوب
+  if (subGroup === 'التمريض العالى' || jobTitle.indexOf('اخصائي تمريض') > -1 || jobTitle.indexOf('اخصائى تمريض') > -1) {
+    return '001E';
+  }
+  if (mainGroup === 'الوظائف التخصصية') {
+    if (subGroup === 'الطب البشرى') return '001A';
+    if (subGroup === 'طب الأسنان') return '001B';
+    if (subGroup === 'الصيدلة') return '001C';
+    if (subGroup === 'العلاج الطبيعى') return '001D';
+    return '001';
+  }
+  if (mainGroup === 'الوظائف الفنية' || mainGroup === 'وظائف التمريض') {
+    if (jobTitle.indexOf('بنك دم') > -1) return '002B';
+    if (subGroup === 'فنى معمل') return '002A';
+    if (subGroup === 'فنى تسجيل طبى واحصاء') return '002C';
+    if (subGroup === 'فنى أشعة') return '002R';
+    if (subGroup === 'فني تغذية') return '002H';
+    if (subGroup === 'فنى أسنان') return '002F';
+    if (jobTitle.indexOf('خدمات طبية') > -1) return '002E';
+    if (subGroup === 'تمريض' || subGroup === 'فنى تمريض' || mainGroup === 'وظائف التمريض') return '002N';
+    return '002';
+  }
+  return '';
+};
+window.getEmployeeCategoryCode = function(e) {
+  if (!e) return '';
+  return classifyEmployeeCategory(e.jobGroup, e.jobSubGroup, e.jobTitle || e.currentWork);
+};
+window.getContractCategoryCode = function(c) {
+  const spec = String((c && c.specialty) || '').trim();
+  if (spec.indexOf('اسنان') > -1) return '001B';
+  if (spec.indexOf('صيدل') > -1) return '001C';
+  if (spec.indexOf('علاج طبيعي') > -1 || spec.indexOf('علاج طبيعى') > -1) return '001D';
+  if (spec.indexOf('تمريض') > -1) return '001E';
+  return '001A';
+};
+
+window.renderOfficialLetterhead = function(code, categoryCode) {
   return `
-    <div style="border:2px solid var(--dark);border-radius:10px;overflow:hidden;margin-bottom:0;">
-      <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
-        <tr>
-          <td style="border-left:2px solid var(--dark);width:33%;text-align:center;padding:10px 6px;font-weight:900;font-size:0.85rem;vertical-align:middle;">
-            محافظة اسيوط<br>مديرية الشئون الصحية بأسيوط<br>مستشفى منفلوط المركزي
-          </td>
-          <td style="border-left:2px solid var(--dark);width:34%;text-align:center;padding:10px 6px;font-weight:900;vertical-align:middle;">
-            كود الموظف<br>
-            <span style="display:inline-block;margin-top:6px;font-size:1.1rem;">( ${code || ''} )</span>
-          </td>
-          <td style="width:33%;text-align:center;padding:10px 6px;font-weight:900;font-size:0.85rem;vertical-align:middle;">
-            <img src="https://i.postimg.cc/vB1vPPgH/file-000000000f2c8210a7afcd2ef9fe049b.png" alt="شعار مستشفى منفلوط النموذجي" style="width:95px;height:95px;border-radius:50%;border:2px solid var(--gold);object-fit:contain;background:#fff;display:block;margin:0 auto 6px;" onerror="this.style.display='none'">
-            مستشفى منفلوط النموذجي
-          </td>
-        </tr>
-      </table>
+    <div class="stmt-watermark" aria-hidden="true">
+      <img src="${window._STMT_EMBLEM_URL}" alt="شعار جمهورية مصر العربية" loading="eager" onerror="if(this.src!=='${window._STMT_EMBLEM_FALLBACK}')this.src='${window._STMT_EMBLEM_FALLBACK}';">
     </div>
-    <div style="text-align:center;font-weight:900;font-size:1.3rem;color:var(--gold-dark);padding:10px 0 15px;">
-      بيان حالة وظيفية
-    </div>`;
+    <div class="stmt-form-head">
+      <div class="stmt-org-text">
+        <b>محافظة أسيوط</b>
+        مديرية الشئون الصحية بأسيوط<br>مستشفى منفلوط المركزي
+      </div>
+      <div class="stmt-code-badge-mid">${categoryCode ? ('كود فئة الموظف: ' + categoryCode) : ('كود الموظف: ' + (code || ''))}</div>
+      <div class="stmt-logo-box stmt-logo-box-lg">
+        <img src="https://i.postimg.cc/vB1vPPgH/file-000000000f2c8210a7afcd2ef9fe049b.png" alt="شعار مستشفى منفلوط النموذجي" style="width:100%;height:100%;object-fit:contain;border-radius:50%;" onerror="this.style.display='none'">
+      </div>
+    </div>
+    <h2 class="stmt-title">بيان الحالة الوظيفية للعاملين بمستشفى منفلوط النموذجي</h2>
+    <div class="stmt-grid">`;
 };
 
 window.renderOfficialFooterSign = function() {
   return `
-    <div style="margin-top:22px;text-align:center;font-weight:700;font-size:0.92rem;color:var(--dark);line-height:1.9;">
-      وتم الإفادة بصورة من هذا البيان الوظيفي للموظف — وذلك للعرض عند اللزوم
     </div>
-    <div style="display:flex;justify-content:space-between;margin-top:35px;text-align:center;font-weight:900;flex-wrap:wrap;gap:15px;">
-      <div><div>مدير شئون العاملين</div><div style="border-top:2px solid var(--dark);width:150px;height:40px;margin:10px auto 0;"></div></div>
-      <div><div>مدير المستشفى</div><div style="border-top:2px solid var(--dark);width:150px;height:40px;margin:10px auto 0;"></div></div>
+    <div class="stmt-note">
+      <div class="stmt-note-line">جميع البيانات الواردة بعالية صحيحة من واقع ملف الموظف لتقديمها إلي</div>
+      <div class="stmt-dots"></div>
     </div>
-    <div style="margin-top:25px;text-align:center;font-family:'Cairo','Tajawal',sans-serif;font-size:0.98rem;color:#000;font-weight:800;border-top:1px solid #ddd;padding-top:10px;line-height:2.1;">
-      <div>تصميم قسم الحوكمة الإلكترونية&nbsp;&nbsp;&nbsp;السيستم الإلكتروني الموحد&nbsp;&nbsp;&nbsp;مستشفى منفلوط النموذجي الجديدة</div>
-      <div>مع تحيات د. وليد سيد حسانين سيد&nbsp;&nbsp;&nbsp;نائب مدير مستشفى منفلوط النموذجي / رئيس لجنة الإشراف والحوكمة&nbsp;&nbsp;&nbsp;أكتوبر 2026م</div>
+    <div class="sign-row">
+      <div class="sign-col">مدير السيستم الموحد</div>
+      <div class="sign-col">مدير الموارد البشرية</div>
+      <div class="sign-col">مدير المستشفى</div>
+    </div>
+    <div class="sign-dots-row">
+      <div class="sign-dots"></div>
+      <div class="sign-dots"></div>
+      <div class="sign-dots"></div>
+    </div>
+    <div class="stmt-credit">
+      <span class="credit-pill">تصميم قسم الحوكمة الإلكترونية&nbsp;&nbsp;السيستم الإلكتروني الموحد&nbsp;&nbsp;مستشفى منفلوط النموذجي الجديدة<br><b>مع تحيات د. وليد سيد حسانين سيد — نائب مدير مستشفى منفلوط النموذجي / رئيس لجنة الإشراف والحوكمة — يناير2027م</b></span>
     </div>`;
 };
 
@@ -5271,7 +5431,7 @@ window.renderNewStatusReport_Basic = async function(navHtml) {
   let searchHtml = '';
   if (isAdmin) {
     searchHtml = `
-      <div style="background:rgba(245,197,24,0.07);border:2px solid var(--gold);border-radius:14px;padding:14px 18px;margin-bottom:18px;">
+      <div class="noprint" style="background:rgba(245,197,24,0.07);border:2px solid var(--gold);border-radius:14px;padding:14px 18px;margin-bottom:18px;">
         <div style="font-weight:900;margin-bottom:10px;color:var(--dark);">🔍 ابحث عن موظف:</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <input type="text" id="empSearch2" placeholder="ابحث بالاسم أو الكود أو الرقم القومي..."
@@ -5368,13 +5528,12 @@ window.showContractStatusReport = function(idx) {
   if (searchInput) searchInput.value = c.name;
 
   const fieldRow = (label, val) => val && val !== '—'
-    ? `<tr><td style="background:var(--gray-bg);font-weight:900;width:40%">${label}</td><td style="font-weight:700">${val}</td></tr>`
+    ? `<div class="row"><span>${label} :</span><b>${val}</b></div>`
     : '';
 
   area.innerHTML = `
-    <div style="background:white;border:3px solid var(--dark);border-radius:20px;padding:25px;max-width:800px;margin:20px auto;" id="contractStatusPrintArea">
-      ${renderOfficialLetterhead(c.code)}
-      <table class="data-table" style="max-width:650px;margin:0 auto;">
+    <div class="stmt-sheet" id="contractStatusPrintArea">
+      ${renderOfficialLetterhead(c.code, getContractCategoryCode(c))}
         ${fieldRow('كود الموظف', c.code)}
         ${fieldRow('الاسم الكامل', c.name)}
         ${fieldRow('الرقم القومي', c.nationalId)}
@@ -5382,7 +5541,6 @@ window.showContractStatusReport = function(idx) {
         ${fieldRow('التخصص', c.specialty)}
         ${fieldRow('جهة العمل', 'مستشفى منفلوط النموذجي')}
         ${fieldRow('تاريخ البيان', new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}))}
-      </table>
       ${renderOfficialFooterSign()}
       <div style="margin-top:20px;text-align:center;">
         <button class="btn-print" onclick="window.print()">🖨️ طباعة البيان</button>
@@ -5449,13 +5607,12 @@ window.showBasicPowerStatusReport = function(idx) {
   if (searchInput) searchInput.value = e.name;
 
   const fieldRow = (label, val) => val && val !== '—'
-    ? `<tr><td style="background:var(--gray-bg);font-weight:900;width:40%">${label}</td><td style="font-weight:700">${val}</td></tr>`
+    ? `<div class="row"><span>${label} :</span><b>${val}</b></div>`
     : '';
 
   area.innerHTML = `
-    <div style="background:white;border:3px solid var(--dark);border-radius:20px;padding:25px;max-width:800px;margin:20px auto;" id="basicPowerStatusPrintArea">
-      ${renderOfficialLetterhead(e.code)}
-      <table class="data-table" style="max-width:650px;margin:0 auto;">
+    <div class="stmt-sheet" id="basicPowerStatusPrintArea">
+      ${renderOfficialLetterhead(e.code, getEmployeeCategoryCode(e))}
         ${fieldRow('م', e.serial)}
         ${fieldRow('كود الموظف', e.code)}
         ${fieldRow('الاسم', e.name)}
@@ -5479,7 +5636,6 @@ window.showBasicPowerStatusReport = function(idx) {
         ${fieldRow('ملاحظات', e.notes)}
         ${fieldRow('جهة العمل', 'مستشفى منفلوط النموذجي')}
         ${fieldRow('تاريخ البيان', new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}))}
-      </table>
       ${renderOfficialFooterSign()}
       <div style="margin-top:20px;text-align:center;">
         <button class="btn-print" onclick="window.print()">🖨️ طباعة البيان</button>
@@ -6014,13 +6170,12 @@ window.showStatusReport = async function(code, name, nid) {
   }
 
   const fieldRow = (label, val) => val && val !== '—'
-    ? `<tr><td style="background:var(--gray-bg);font-weight:900;width:40%">${label}</td><td style="font-weight:700">${val}</td></tr>`
+    ? `<div class="row"><span>${label} :</span><b>${val}</b></div>`
     : '';
 
   area.innerHTML = `
-    <div style="background:white;border:3px solid var(--dark);border-radius:20px;padding:25px;max-width:800px;margin:20px auto;" id="statusPrintArea">
-      ${renderOfficialLetterhead(code)}
-      <table class="data-table" style="max-width:650px;margin:0 auto;">
+    <div class="stmt-sheet" id="statusPrintArea">
+      ${renderOfficialLetterhead(code, classifyEmployeeCategory(ext.department, ext.speciality, ext.job_title))}
         ${fieldRow('كود الموظف', code)}
         ${fieldRow('الاسم الكامل', empName)}
         ${fieldRow('الرقم القومي', empNid)}
@@ -6036,7 +6191,6 @@ window.showStatusReport = async function(code, name, nid) {
         ${fieldRow('نوع العقد', ext.contract_type||'—')}
         ${fieldRow('جهة العمل', 'مستشفى منفلوط النموذجي')}
         ${fieldRow('تاريخ البيان', new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}))}
-      </table>
       ${renderOfficialFooterSign()}
       <div style="margin-top:20px;text-align:center;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
         <button class="btn-print" onclick="window.print()">🖨️ طباعة البيان</button>
