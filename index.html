@@ -316,7 +316,7 @@ body::before {
   outline:none;direction:rtl;
 }
 .modal-search input:focus { border-color:rgba(0,180,216,.6); }
-.modal-body { overflow-y:auto;padding:0 24px 24px;flex:1; }
+.modal-body { overflow-y:auto;padding:18px 24px 24px;flex:1;max-height:60vh; }
 
 /* تبويبات مودال صلاحيات المستخدمين */
 .perm-tab-btn {
@@ -1711,12 +1711,12 @@ window.addEventListener('DOMContentLoaded', function(){
 
     <!-- تبويب: سجل الإجراءات (مثل «سجل إجراءات الأدمن» في منظومة الموارد البشرية) -->
     <div id="permTabLog" style="display:none;">
-      <div class="modal-body" id="adminLogBody" style="max-height:520px;overflow:auto;"></div>
+      <div class="modal-body" id="adminLogBody" style="overflow:auto;"></div>
     </div>
 
     <!-- تبويب: الإحصاء الطبي والحوكمة (نظرة موحّدة عبر الجسر المشترك — مثل باقي الأنظمة الخمسة) -->
     <div id="permTabStats" style="display:none;">
-      <div class="modal-body" style="max-height:560px;overflow:auto;">
+      <div class="modal-body" style="overflow:auto;">
         <div id="statsHubView">
           <div style="text-align:center;font-size:.85rem;font-weight:700;color:#9fa8da;background:rgba(0,180,216,.08);border-radius:14px;padding:10px 16px;margin:14px 0 20px;border:1px solid rgba(0,180,216,.25)">
             نظرة موحّدة على الطلبات المشتركة وسجل الحوكمة المركزي من كل الأنظمة الخمسة عبر الجسر المشترك (hospital-sync-bridge)
