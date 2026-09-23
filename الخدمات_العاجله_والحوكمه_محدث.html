@@ -1241,45 +1241,6 @@ table tbody tr:hover {
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  // ==================== اتصال ثانوي بقاعدة بيانات سيستم4 (الترددات والإشغال والتعاقدات) ====================
-  // لعرض التقارير الطبية المرفوعة فعليًا داخل "الخدمات العاجلة والتواصل الفعال"
-  const tardadatConfig = {
-    apiKey: "AIzaSyCoY8IwIuieaQNjZG3K-J1y3PKNMmlv7eo",
-    authDomain: "tardadat-system.firebaseapp.com",
-    projectId: "tardadat-system",
-    storageBucket: "tardadat-system.firebasestorage.app",
-    messagingSenderId: "856572328710",
-    appId: "1:856572328710:web:f18de9a763dfa2c6293c87"
-  };
-  const tardadatApp = initializeApp(tardadatConfig, 'tardadatLink');
-  const tardadatDb = getFirestore(tardadatApp);
-  const tardadatAuth = getAuth(tardadatApp);
-
-  // Promise يضمن اكتمال تسجيل الدخول الحقيقي في مشروع الترددات (tardadat-system) قبل أي قراءة من medical_reports
-  // ملحوظة أمنية: كان بيستخدم signInAnonymously سابقًا، لكن ده بيفتح الباب لأي زائر (حتى من غير تسجيل دخول)
-  // يقرا التقارير الطبية بمجرد فتح الصفحة. اتغيّر لدخول حقيقي (password) بنفس منطق سيستم3،
-  // بيتم استدعاؤه فقط بعد نجاح تسجيل الدخول الحقيقي في سيستم1 نفسه — عشان يطابق قواعد الأمان الجديدة
-  // اللي بترفض أي دخول مجهول (sign_in_provider != 'password') على مشروع tardadat-system.
-  let _tardadatAuthResolve;
-  const authReady = new Promise(res => { _tardadatAuthResolve = res; });
-  async function ensureTardadatAuth(name) {
-    try {
-      const enc = new TextEncoder().encode('tardadat-link::' + name.trim());
-      const hashBuffer = await crypto.subtle.digest('SHA-256', enc);
-      const hex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-      const techEmail = `u_${hex.slice(0, 16)}@tardadat-link.local`;
-      const techPass = hex.slice(16, 36);
-      try {
-        await signInWithEmailAndPassword(tardadatAuth, techEmail, techPass);
-      } catch (authErr) {
-        if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/invalid-login-credentials') {
-          await createUserWithEmailAndPassword(tardadatAuth, techEmail, techPass);
-        } else { throw authErr; }
-      }
-    } catch(e) { console.warn('tardadat real auth:', e.message); }
-    _tardadatAuthResolve();
-  }
-
   // ==================== Firebase Authentication الحقيقية ====================
   // نفس منطق سكريبت الترحيل (migrate_sys1_governance.js) بالحرف الواحد
   // عشان الإيميل المولّد هنا يطابق تمامًا الحساب اللي اتعمل في Firebase Auth
@@ -2921,6 +2882,8 @@ table tbody tr:hover {
           allRequests[index].supervisorApproved = true;
           await sendNotification(allRequests[index].username, '✅ تمت موافقة رئيس القسم', `تمت الموافقة على طلب ${allRequests[index].type} الخاص بك وهو الآن ينتظر الاعتماد النهائي`, '', 'success');
         }
+        // مزامنة حالة الطلب مع الجسر المشترك عشان الأنظمة التانية تشوف المرحلة الجديدة (لسه مش اعتماد نهائي، فمفيش خصم رصيد هنا)
+        if (data.sharedId) window.syncSharedRequestStatus(data.sharedId, 'pending_final', currentUser);
         // إرسال إشعار للأدمن
         await sendNotification('وليد سيد حسانين سيد', '📋 طلب بانتظار الاعتماد', `وافق ${currentUser} على طلب ${data.type||''} المقدم من ${data.username||''}`, '', 'info');
         showToast('✅ تمت الموافقة ورفع للإدارة العليا');
@@ -2967,6 +2930,8 @@ table tbody tr:hover {
             await sendNotification(allRequests[index].exchangeWith, '🔄 مبادلة معتمدة', `تم اعتماد المبادلة مع ${allRequests[index].username} بتاريخ ${allRequests[index].date||''}`, '', 'success');
           }
         }
+        // مزامنة الاعتماد النهائي مع الجسر المشترك — بيخصم الرصيد فعليًا لو إجازة، ويظهر معتمد فورًا عند باقي الأنظمة
+        if (data.sharedId) window.approveSharedRequestBridge(data.sharedId, 'approved', currentUser);
         showToast('🎉 تم الاعتماد النهائي');
       }
       if (window._inGovApprovalsScreen && window._govApprovalsCurrentMode) { window.openGovApprovalsCategory(window._govApprovalsCurrentMode); }
@@ -3006,6 +2971,8 @@ table tbody tr:hover {
           });
           await sendNotification(allRequests[index].username, '❌ تم رفض طلبك', `تم رفض طلب ${allRequests[index].type} الخاص بك`, reason, 'danger');
         }
+        // مزامنة الرفض مع الجسر المشترك عشان يختفي من قيد الاعتماد عند باقي الأنظمة كمان
+        if (data.sharedId) window.approveSharedRequestBridge(data.sharedId, 'rejected', currentUser, reason);
       }
       showToast('❌ تم الرفض وتم إرسال إشعار للمستخدم');
       if (window._inGovApprovalsScreen && window._govApprovalsCurrentMode) { window.openGovApprovalsCategory(window._govApprovalsCurrentMode); }
@@ -4416,6 +4383,23 @@ table tbody tr:hover {
     } catch (e) { console.log('تعذر تحديث حالة الطلب في الشيت المشترك:', e); }
   };
 
+  // ✅ (22-09-2026 — منقول من نظام الترددات والإشغال) نداء موحّد واحد بدل (syncSharedRequestStatus + applyApprovedRequestToBridge):
+  // الباك إند بنفسه بيحدّث حالة الطلب، ويسجله في سجل الحوكمة لو معتمد، ويخصم الرصيد لو إجازة —
+  // كل ده من نفس بيانات الطلب المخزّنة في الشيت المشترك، فمفيش احتمال نداء ينجح والتاني يفشل بصمت.
+  window.approveSharedRequestBridge = async function(sharedId, status, decidedBy, rejectReason) {
+    if (!window.LEAVE_SYNC_URL || !sharedId) return { ok: false };
+    try {
+      const res = await fetch(window.LEAVE_SYNC_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'approveSharedRequest', sharedId, status, decidedBy: decidedBy || '', rejectReason: rejectReason || '' })
+      });
+      return await res.json();
+    } catch (e) {
+      console.log('تعذر اعتماد الطلب عبر الجسر الموحّد:', e);
+      return { ok: false, error: String(e && e.message || e) };
+    }
+  };
+
   window.fetchRemoteSharedRequests = async function(statusList) {
     if (!window.LEAVE_SYNC_URL) return [];
     try {
@@ -4488,8 +4472,7 @@ table tbody tr:hover {
   window.updateRemoteSharedRequestStatus = function(sharedId, status, requestObj) {
     if (!sharedId) { showToast && showToast('❌ تعذر تحديد الطلب'); return; }
     if (!confirm(status === 'approved' ? 'تأكيد اعتماد هذا الطلب؟' : 'تأكيد رفض هذا الطلب؟')) return;
-    Promise.resolve(window.syncSharedRequestStatus(sharedId, status, (typeof currentUser !== 'undefined' && currentUser) || ''))
-      .then(() => { if (status === 'approved') return window.applyApprovedRequestToBridge({ ...requestObj, status }); })
+    Promise.resolve(window.approveSharedRequestBridge(sharedId, status, (typeof currentUser !== 'undefined' && currentUser) || ''))
       .then(() => { showToast && showToast(status === 'approved' ? '✅ تم اعتماد الطلب' : '❌ تم رفض الطلب'); renderApprovals(); })
       .catch(() => showToast && showToast('❌ تعذر تحديث الحالة في الجسر المشترك'));
   };
@@ -6413,7 +6396,7 @@ window.checkIframeContent = function(id, downloadUrl) {
   };
 
   // ==================== التقارير الطبية المرفوعة (منقولة بالكامل من سيستم الترددات والإشغال والتعاقدات - رفع/تعديل/حذف) ====================
-  // البيانات مُخزَّنة في مشروع Firestore الخاص بسيستم الترددات (tardadatDb) للحفاظ على التقارير القديمة واستمرارية العمل
+  // البيانات مُخزَّنة في قاعدة Firestore الخاصة بسيستم1 نفسه (hospital-governance-system) — تم نقلها من قاعدة سيستم الترددات سابقًا لجعل sys1 مستقلاً بالكامل
   window.renderMedicalReportsHubEntry = function() {
     document.getElementById('appModal').style.display = 'flex';
     renderMedicalReportsHub(document.getElementById('modalBody'));
@@ -6844,9 +6827,8 @@ window.checkIframeContent = function(id, downloadUrl) {
   let mrUnsubscribe = null;
 
   function startMrLiveListener() {
-    authReady.then(() => {
     if (mrUnsubscribe) { mrUnsubscribe(); mrUnsubscribe = null; }
-    const q = query(collection(tardadatDb, 'medical_reports'), orderBy('timestamp', 'desc'), limit(300));
+    const q = query(collection(db, 'medical_reports'), orderBy('timestamp', 'desc'), limit(300));
     mrUnsubscribe = onSnapshot(q, (snap) => {
       mrAllData = [];
       snap.forEach(d => mrAllData.push({ id: d.id, ...d.data() }));
@@ -6859,7 +6841,6 @@ window.checkIframeContent = function(id, downloadUrl) {
       if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="mr-empty" style="color:red">❌ خطأ: ${err.message}</td></tr>`;
     });
     // (لا حاجة لتسجيل في activeListeners هنا - غير مستخدم في sys1)
-    }); // end authReady.then
   }
 
   // ==================== التقارير المرفوعة: عرض تجميعي (بدون نموذج رفع) ====================
@@ -7123,7 +7104,7 @@ window.checkIframeContent = function(id, downloadUrl) {
     };
     try {
       if (statusEl) { statusEl.style.color='#92400E'; statusEl.textContent = '⏳ جاري الحفظ...'; }
-      await updateDoc(doc(tardadatDb, 'medical_reports', id), updData);
+      await updateDoc(doc(db, 'medical_reports', id), updData);
       if (statusEl) { statusEl.style.color='#065F46'; statusEl.textContent = '✅ تم الحفظ بنجاح!'; }
       showToast('✅ تم تعديل التقرير بنجاح');
       setTimeout(() => { document.getElementById('mr_edit_modal').style.display = 'none'; }, 1500);
@@ -7138,7 +7119,7 @@ window.checkIframeContent = function(id, downloadUrl) {
     if (!['admin','supermanager'].includes(currentUserData?.type)) { showToast('⛔ ليس لديك صلاحية الحذف'); return; }
     if (!confirm('⚠️ هل تريد حذف هذا التقرير نهائياً؟\nلا يمكن التراجع عن هذا الإجراء.')) return;
     try {
-      await deleteDoc(doc(tardadatDb, 'medical_reports', id));
+      await deleteDoc(doc(db, 'medical_reports', id));
       showToast('✅ تم حذف التقرير بنجاح');
     } catch(e) {
       showToast('❌ خطأ في الحذف: ' + e.message);
@@ -7274,7 +7255,7 @@ window.checkIframeContent = function(id, downloadUrl) {
       if (progBar) progBar.style.width = '85%';
       if (progLabel) progLabel.textContent = '⏳ جاري الحفظ في قاعدة البيانات...';
 
-      await addDoc(collection(tardadatDb, 'medical_reports'), {
+      await addDoc(collection(db, 'medical_reports'), {
         type, dept, date, author, title, content,
         attachments,
         recordedBy: currentUser,
@@ -8983,9 +8964,6 @@ ${body}
     } catch (e) {
       console.warn('Firebase Auth session error (تم تجاهله، الدخول لسه سليم):', e.message);
     }
-    // تفعيل الاتصال الحقيقي (غير مجهول) بمشروع الترددات لعرض التقارير الطبية بأمان
-    ensureTardadatAuth(username);
-
     if (user.type !== userType) { document.getElementById('loginError').textContent = 'نوع المستخدم غير مطابق لبياناتك'; document.getElementById('loginError').style.display = 'block'; setTimeout(() => document.getElementById('loginError').style.display = 'none', 3000); return; }
     currentUser = username;
     currentUserData = user;

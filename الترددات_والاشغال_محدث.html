@@ -119,11 +119,11 @@
   .login-card { position: relative; z-index: 1; background: linear-gradient(160deg, #0a2e1a 0%, #1b5e35 40%, #0d4a22 70%, #0a2e1a 100%) !important; background-color: #0a2e1a !important; border-radius: 40px; padding: 45px 40px; max-width: 550px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 3px #000, 0 0 30px rgba(40,180,100,0.3); border: 3px solid #1a7a3a; }
   .login-wrap { position: relative; z-index: 1; display: flex; gap: 25px; align-items: flex-start; justify-content: center; flex-wrap: wrap; max-width: 1000px; width: 100%; margin: 0 auto; }
   .login-side-cards { display: flex; flex-direction: column; gap: 20px; width: 340px; }
-  .side-card { background: #ffffff; border-radius: 25px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.3s ease; border: 3px solid #000000; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+  .side-card { background: #ffffff; border-radius: 25px; padding: 14px 10px; text-align: center; cursor: pointer; transition: all 0.3s ease; border: 3px solid #000000; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
   .side-card:hover { transform: translateY(-6px); box-shadow: 0 15px 30px rgba(0,0,0,0.4); border-color: #e6b800; }
   .side-card-icon { width: 70px; height: 70px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 2.1rem; border: 3px solid #000000; border-radius: 50%; background: #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-  .side-card-icon-img { width: 200px; height: 200px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border: 3px solid #000000; border-radius: 16px; background: #ffffff; overflow: hidden; }
-  .side-card-icon-img img { width: 100%; height: 100%; object-fit: cover; }
+  .side-card-icon-img { width: 100%; max-width: 300px; aspect-ratio: 1 / 1; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border: 3px solid #000000; border-radius: 16px; background: #ffffff; overflow: hidden; box-sizing: border-box; }
+  .side-card-icon-img img { width: 100%; height: 100%; object-fit: contain; }
   .side-card-title { font-weight: 900; color: #0a2e1a; font-size: 1.1rem; line-height: 1.3; }
   .login-rights-card { position: relative; z-index: 1; max-width: 900px; width: 100%; margin: 20px auto 0; background: rgba(10,46,26,0.9); border: 2px solid var(--primary-gold); border-radius: 20px; padding: 15px 25px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
   @media (max-width: 820px) { .login-side-cards { flex-direction: row; width: 100%; flex-wrap: wrap; } .side-card { flex: 1 1 200px; } }
@@ -2325,6 +2325,41 @@
     } catch (e) { console.log('تعذر جلب الطلبات من الأنظمة الأخرى:', e); return []; }
   };
 
+  // ✅ (22-09-2026) توفيق حالة الطلبات المحلية (general_requests) مع الجسر المشترك: لو طلب
+  // اتقدّم من هنا (الترددات) وانتظر الاعتماد، بعدين اتاعتمد/اترفض من نظام تاني (البوابة أو أي
+  // من الأنظمة الخمسة) عن طريق sharedId بتاعه — كان بيفضل شكله "pending" هنا للأبد، لأن
+  // general_requests (Firestore الخاص بهذا النظام فقط) ما كانتش بتتحدّث إلا لو الاعتماد حصل
+  // من جوه هذا النظام نفسه عن طريق updateGeneralRequestStatus. الدالة دي بتقارن كل الطلبات
+  // المحلية "pending" اللي ليها sharedId بحالتها الحقيقية في الشيت المشترك، وتحدّث Firestore
+  // لو اتغيّرت — بنفس فكرة reconcileLocalGovRequestsWithBridge_ في نظام التحول الرقمي.
+  window.reconcileGeneralRequestsWithBridge = async function() {
+    if (!window.LEAVE_SYNC_URL) return false;
+    try {
+      const snap = await getDocs(query(collection(db, 'general_requests'), where('status', '==', 'pending')));
+      const pendingDocs = snap.docs.filter(d => d.data().sharedId);
+      if (!pendingDocs.length) return false;
+      const res = await window._fetchWithTimeout(window.LEAVE_SYNC_URL + '?action=getSharedRequests&status=' + encodeURIComponent('approved,rejected'), {}, 8000);
+      const j = await res.json();
+      const items = Array.isArray(j?.items) ? j.items : [];
+      if (!items.length) return false;
+      const bridgeById = {};
+      items.forEach(it => { if (it.sharedId) bridgeById[it.sharedId] = it; });
+      let changed = false;
+      await Promise.all(pendingDocs.map(async d => {
+        const r = d.data();
+        const decided = bridgeById[r.sharedId];
+        if (decided && (decided.status === 'approved' || decided.status === 'rejected')) {
+          const patch = { status: decided.status };
+          if (decided.decidedBy) patch.decidedBy = decided.decidedBy;
+          if (decided.rejectReason) patch.rejectReason = decided.rejectReason;
+          await updateDoc(doc(db, 'general_requests', d.id), patch);
+          changed = true;
+        }
+      }));
+      return changed;
+    } catch (e) { console.log('تعذر توفيق حالة الطلبات المحلية مع الجسر المشترك:', e); return false; }
+  };
+
   // تسجيل اعتماد إجازة (عارضة/اعتيادية) في نفس شيت الرصيد الحي — بيخصم من الرصيد فعليًا
   window.syncLeaveToLiveSheet = async function(name, isCasual, dateStr, days) {
     try {
@@ -2399,7 +2434,7 @@
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px;max-width:900px;margin:0 auto">
         ${Object.entries(SVCGOV_TYPES).map(([key, t]) => `
-          <div onclick="window.renderSvcgovForm('${key}')"
+          <div onclick="${(key==='leave_casual'||key==='leave_annual') ? `window.renderSvcgovLeaveForm('${key==='leave_casual'?'casual':'annual'}')` : `window.renderSvcgovForm('${key}')`}"
                style="cursor:pointer;border-radius:20px;padding:22px 16px;text-align:center;
                       background:${t.bg};border:2px solid ${t.color};transition:all .3s"
                onmouseover="this.style.transform='translateY(-6px)'" onmouseout="this.style.transform=''">
@@ -2475,6 +2510,158 @@
       if (typeof window.pushSharedRequest === 'function') {
         await window.pushSharedRequest(docRef.id, {
           sharedId, date, name, type: typeLabelMap[type] || type, details,
+          status: 'pending', dept, requestedBy: currentUser || '', category: 'خدمات عامة وطلبات'
+        });
+      }
+      if (typeof showToast === 'function') showToast('✅ تم رفع الطلب بنجاح'); else alert('✅ تم رفع الطلب بنجاح');
+      openModal('services');
+    } catch (e) {
+      console.error(e);
+      alert('⚠️ حصل خطأ أثناء رفع الطلب: ' + (e.message || e));
+    }
+  };
+
+  // ==================== نموذج طلب الإجازة التفصيلي (منقول من نظام الخدمات العاجلة والحوكمة) ====================
+  window.renderSvcgovLeaveForm = function(leaveType) {
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    const today = new Date().toISOString().split('T')[0];
+    const nameOptions = Object.keys(USERS).sort().map(n => `<option value="${n.replace(/"/g,'&quot;')}" ${n===currentUser?'selected':''}>${n}</option>`).join('');
+    const isCasual = leaveType === 'casual';
+    const title = isCasual ? 'إجازة عارضة' : 'إجازة اعتيادية';
+    const icon = isCasual ? '📋' : '🌴';
+
+    body.innerHTML = `
+      <div class="section-header">
+        <h2>${icon} طلب ${title}</h2>
+        <button class="back-btn" onclick="renderServicesGov(document.getElementById('modalBody'))">← رجوع للخدمات العامة</button>
+      </div>
+      <div style="max-width:650px;margin:0 auto;background:#fff;border:3px solid #1a1a2e;border-radius:18px;overflow:hidden">
+        <div style="background:#1a1a2e;color:#e6b800;padding:14px 20px;text-align:center;font-weight:900;font-size:1.1rem">
+          🏥 مستشفى منفلوط النموذجي — طلب ${title}
+        </div>
+        <div style="padding:22px">
+          <input type="hidden" id="svl_type" value="${leaveType}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+            <div>
+              <label style="font-weight:900;font-size:0.85rem;display:block;margin-bottom:5px">👤 الاسم:</label>
+              <select id="svl_name" onchange="svlUpdateDept()" style="width:100%;padding:10px;border:2px solid #1a1a2e;border-radius:10px;font-family:inherit;font-weight:700">${nameOptions}</select>
+            </div>
+            <div>
+              <label style="font-weight:900;font-size:0.85rem;display:block;margin-bottom:5px">🏢 القسم:</label>
+              <input id="svl_dept" placeholder="اسم القسم" style="width:100%;padding:10px;border:2px solid #1a1a2e;border-radius:10px;font-family:inherit;font-weight:700">
+            </div>
+            <div>
+              <label style="font-weight:900;font-size:0.85rem;display:block;margin-bottom:5px">💼 الوظيفة:</label>
+              <input id="svl_job" placeholder="المسمى الوظيفي" style="width:100%;padding:10px;border:2px solid #1a1a2e;border-radius:10px;font-family:inherit;font-weight:700">
+            </div>
+            ${isCasual ? `
+            <div>
+              <label style="font-weight:900;font-size:0.85rem;display:block;margin-bottom:5px">📅 تاريخ الإجازة:</label>
+              <input type="date" id="svl_date" value="${today}" style="width:100%;padding:10px;border:2px solid #1a1a2e;border-radius:10px;font-family:inherit;font-weight:700">
+            </div>
+            <div>
+              <label style="font-weight:900;font-size:0.85rem;display:block;margin-bottom:5px">⏱️ المدة (أيام):</label>
+              <input type="number" id="svl_days" value="1" min="1" max="3" style="width:100%;padding:10px;border:2px solid #1a1a2e;border-radius:10px;font-family:inherit;font-weight:700">
+            </div>
+            ` : `
+            <div>
+              <label style="font-weight:900;font-size:0.85rem;display:block;margin-bottom:5px">📅 من تاريخ:</label>
+              <input type="date" id="svl_from" value="${today}" style="width:100%;padding:10px;border:2px solid #1a1a2e;border-radius:10px;font-family:inherit;font-weight:700">
+            </div>
+            <div>
+              <label style="font-weight:900;font-size:0.85rem;display:block;margin-bottom:5px">📅 إلى تاريخ:</label>
+              <input type="date" id="svl_to" value="${today}" style="width:100%;padding:10px;border:2px solid #1a1a2e;border-radius:10px;font-family:inherit;font-weight:700">
+            </div>
+            <div>
+              <label style="font-weight:900;font-size:0.85rem;display:block;margin-bottom:5px">👷 القائم بالعمل خلال الإجازة:</label>
+              <input id="svl_acting" placeholder="اسم القائم بالعمل" style="width:100%;padding:10px;border:2px solid #1a1a2e;border-radius:10px;font-family:inherit;font-weight:700">
+            </div>
+            <div style="grid-column:1 / -1">
+              <label style="font-weight:900;font-size:0.85rem;display:block;margin-bottom:5px">📝 السبب / الملاحظات:</label>
+              <textarea id="svl_reason" rows="2" placeholder="اكتب السبب..." style="width:100%;padding:10px;border:2px solid #1a1a2e;border-radius:10px;font-family:inherit;font-weight:700;resize:vertical"></textarea>
+            </div>
+            `}
+          </div>
+          <div style="margin:15px 0">
+            <label style="font-weight:900;font-size:0.9rem;display:block;margin-bottom:8px;color:#1a1a2e">📊 رصيد ${title}:</label>
+            <table style="width:100%;border-collapse:collapse;font-size:0.85rem;text-align:center">
+              <thead><tr style="background:#1a1a2e;color:#e6b800">
+                <th style="padding:9px;border:1px solid #444">رصيد ${title}</th>
+                <th style="padding:9px;border:1px solid #444">إجازات سابقة</th>
+                <th style="padding:9px;border:1px solid #444">الإجازات المتبقية</th>
+                <th style="padding:9px;border:1px solid #444">مسئول الإجازات</th>
+              </tr></thead>
+              <tbody><tr>
+                <td style="padding:9px;border:1px solid #ddd"><input id="svl_balance" type="number" value="${isCasual?7:45}" style="width:70px;text-align:center;border:1px solid #ddd;border-radius:6px;padding:4px;font-family:inherit;font-weight:700"></td>
+                <td style="padding:9px;border:1px solid #ddd"><input id="svl_taken" type="number" value="0" style="width:70px;text-align:center;border:1px solid #ddd;border-radius:6px;padding:4px;font-family:inherit;font-weight:700"></td>
+                <td style="padding:9px;border:1px solid #ddd;font-weight:900;color:#2d6a4f" id="svl_remain">${isCasual?7:45}</td>
+                <td style="padding:9px;border:1px solid #ddd"><input id="svl_officer" placeholder="اسم المسئول" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:4px;font-family:inherit;font-weight:700"></td>
+              </tr></tbody>
+            </table>
+          </div>
+          <div style="display:flex;justify-content:space-around;margin-top:20px;text-align:center;font-weight:900;border-top:2px solid #1a1a2e;padding-top:15px;gap:10px;flex-wrap:wrap">
+            <div style="text-align:center"><div style="border-bottom:2px solid #1a1a2e;width:140px;height:40px;margin:0 auto"></div><div style="font-size:0.8rem;margin-top:5px">✍️ توقيع الموظف</div></div>
+            <div style="text-align:center"><div style="border-bottom:2px solid #1a1a2e;width:140px;height:40px;margin:0 auto"></div><div style="font-size:0.8rem;margin-top:5px">👨‍⚕️ توقيع رئيس القسم</div></div>
+            <div style="text-align:center"><div style="border-bottom:2px solid #1a1a2e;width:140px;height:40px;margin:0 auto"></div><div style="font-size:0.8rem;margin-top:5px">🏥 مدير المستشفى</div></div>
+          </div>
+          <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;flex-wrap:wrap">
+            <button onclick="submitSvcgovLeaveRequest('${leaveType}')" style="background:#2d6a4f;color:white;padding:12px 28px;border:none;border-radius:40px;font-weight:900;cursor:pointer;font-size:1rem">📤 رفع الطلب</button>
+            <button onclick="window.print()" style="background:#6c757d;color:white;padding:12px 28px;border:none;border-radius:40px;font-weight:900;cursor:pointer;font-size:1rem">🖨️ طباعة</button>
+            <button onclick="renderServicesGov(document.getElementById('modalBody'))" style="background:#e76f51;color:white;padding:12px 28px;border:none;border-radius:40px;font-weight:900;cursor:pointer;font-size:1rem">✕ إلغاء</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    window.svlUpdateDept = function() {
+      const name = document.getElementById('svl_name')?.value;
+      const deptField = document.getElementById('svl_dept');
+      if (deptField && name && USERS[name]) deptField.value = (USERS[name].dept && USERS[name].dept !== 'all') ? USERS[name].dept : '';
+    };
+    svlUpdateDept();
+
+    const updateSvlRemain = () => {
+      const b = parseInt(document.getElementById('svl_balance')?.value) || 0;
+      const t = parseInt(document.getElementById('svl_taken')?.value) || 0;
+      const rem = document.getElementById('svl_remain');
+      if (rem) rem.textContent = Math.max(0, b - t);
+    };
+    document.getElementById('svl_balance')?.addEventListener('input', updateSvlRemain);
+    document.getElementById('svl_taken')?.addEventListener('input', updateSvlRemain);
+  };
+
+  window.submitSvcgovLeaveRequest = async function(leaveType) {
+    const isCasual = leaveType === 'casual';
+    const typeKey = isCasual ? 'leave_casual' : 'leave_annual';
+    const typeLabel = SVCGOV_TYPES[typeKey].label;
+    const name = document.getElementById('svl_name')?.value.trim();
+    const dept = document.getElementById('svl_dept')?.value.trim();
+    const job = document.getElementById('svl_job')?.value.trim() || '';
+    const officer = document.getElementById('svl_officer')?.value.trim() || '';
+    if (!name) { alert('من فضلك اختر الاسم'); return; }
+    let date, details;
+    if (isCasual) {
+      date = document.getElementById('svl_date')?.value;
+      const days = document.getElementById('svl_days')?.value || '1';
+      details = `${typeLabel} - ${days} أيام - الوظيفة: ${job} - مسئول الإجازات: ${officer}`;
+    } else {
+      date = document.getElementById('svl_from')?.value;
+      const to = document.getElementById('svl_to')?.value;
+      const acting = document.getElementById('svl_acting')?.value.trim() || '';
+      const reason = document.getElementById('svl_reason')?.value.trim() || '';
+      details = `${typeLabel} - من ${date} إلى ${to} - الوظيفة: ${job} - القائم بالعمل: ${acting} - السبب: ${reason} - مسئول الإجازات: ${officer}`;
+    }
+    if (!date) { alert('من فضلك اختر التاريخ'); return; }
+    try {
+      const sharedId = window._genSharedId ? window._genSharedId() : undefined;
+      const docRef = await addDoc(collection(db, 'general_requests'), {
+        type: typeKey, typeLabel, name, dept, date, details,
+        status: 'pending', sharedId, requestedBy: currentUser || '', createdAt: serverTimestamp()
+      });
+      if (typeof window.pushSharedRequest === 'function') {
+        await window.pushSharedRequest(docRef.id, {
+          sharedId, date, name, type: typeLabel, details,
           status: 'pending', dept, requestedBy: currentUser || '', category: 'خدمات عامة وطلبات'
         });
       }
@@ -3136,6 +3323,9 @@ window.showMonthlyOccupancyFiles = async function(category) {
   // الاثنين بيتنفذوا مع بعض (مش الواحد بعد التاني) عشان الشاشة توصل بسرعة حتى لو اتصال الشيت المركزي بطيء
   window._grFetchAllRows = async function() {
     const rows = [];
+    if (typeof window.reconcileGeneralRequestsWithBridge === 'function') {
+      await window.reconcileGeneralRequestsWithBridge();
+    }
     const [localResult, remoteResult] = await Promise.allSettled([
       getDocs(query(collection(db, 'general_requests'), orderBy('createdAt', 'desc'), limit(500))),
       window.fetchRemoteSharedRequests()

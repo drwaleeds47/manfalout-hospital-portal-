@@ -2326,7 +2326,7 @@ footer b{
       <div class="toolbar">
         <button class="action-btn page-back gov-back" type="button"><span>↩</span><span>رجوع</span></button>
       </div>
-      <div class="hrsub-grid">
+      <div class="hrsub-grid" id="govStatsCardsGrid">
         <div class="hrsub-card" data-govstats="approvals">
           <div class="hrsub-icon">✅</div>
           <div class="hrsub-title" style="color:#ffd875;">شاشة الموافقات</div>
@@ -2371,14 +2371,12 @@ footer b{
       </div>
 
       <div id="govStats-approvals" style="display:none;margin-top:14px;">
-        <div class="table-wrap"><div class="table-scroll">
-          <table><thead><tr><th>الطلب</th><th>مقدم الطلب</th><th>الحالة</th><th>إجراء</th></tr></thead>
-            <tbody id="govApprovalsBody"></tbody>
-          </table>
-        </div></div>
+        <div class="toolbar"><button class="action-btn page-back gov-stats-back" type="button"><span>↩</span><span>رجوع لقائمة الإحصاء الطبي والحوكمة</span></button></div>
+        <div id="govApprovalsRoot"></div>
       </div>
 
       <div id="govStats-inquiries" style="display:none;margin-top:14px;">
+        <div class="toolbar"><button class="action-btn page-back gov-stats-back" type="button"><span>↩</span><span>رجوع لقائمة الإحصاء الطبي والحوكمة</span></button></div>
         <div class="search-wrap-inline">
           <input type="text" id="govInquirySearch" placeholder="اكتب اسم الموظف أو المتعاقد للاستعلام..." autocomplete="off" style="width:100%;">
         </div>
@@ -2386,6 +2384,7 @@ footer b{
       </div>
 
       <div id="govStats-bridge" style="display:none;margin-top:14px;">
+        <div class="toolbar"><button class="action-btn page-back gov-stats-back" type="button"><span>↩</span><span>رجوع لقائمة الإحصاء الطبي والحوكمة</span></button></div>
         <div class="search-wrap-inline" style="display:flex; gap:8px; align-items:stretch; flex:1 1 100%; min-width:0;">
           <input type="text" id="govBridgeSearch" placeholder="اكتب أول حرفين من اسم الموظف للبحث في شيت حوكمة المستخدمين المشترك بين الأنظمة الستة..." autocomplete="off" style="flex:1; min-width:0;">
           <button type="button" id="govBridgeSearchBtn" class="action-btn" style="background:linear-gradient(135deg,#ffe066,#ffd23f); color:#000; border:3px solid #000; white-space:nowrap; flex:0 0 auto;"><span>🔍</span><span>بحث</span></button>
@@ -4990,7 +4989,7 @@ function firestoreBootstrapGovRequests(arr){
     firestoreLoadGovRequests().then(function(remoteArr){
       if(remoteArr && remoteArr.length){
         govSave(GOV_REQUESTS_KEY, remoteArr);
-        if(document.getElementById('govApprovalsBody')) renderGovApprovals();
+        if(document.getElementById('govApprovalsRoot')) renderGovApprovals();
         if(document.getElementById('svcListBody')) renderSvcList();
       } else {
         const local = govLoad(GOV_REQUESTS_KEY, []);
@@ -5360,10 +5359,23 @@ function renderGovLog(){
 document.querySelectorAll('#govPanel-stats [data-govstats]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const name = btn.dataset.govstats;
+    document.getElementById('govStatsCardsGrid').style.display = 'none';
+    document.getElementById('govStatusMainSearchWrap').style.display = 'none';
+    document.getElementById('govStatusContractSearchWrap').style.display = 'none';
     ['approvals','inquiries','bridge'].forEach(n=>{
       document.getElementById('govStats-'+n).style.display = (n===name) ? '' : 'none';
     });
     if(name==='approvals') renderGovApprovals();
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+});
+document.querySelectorAll('#govPanel-stats .gov-stats-back').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    ['approvals','inquiries','bridge'].forEach(n=>{
+      document.getElementById('govStats-'+n).style.display = 'none';
+    });
+    document.getElementById('govStatsCardsGrid').style.display = '';
+    window.scrollTo({top:0, behavior:'smooth'});
   });
 });
 /* ---- جلب الطلبات الواردة من الأنظمة الخمسة التانية عبر نفس الجسر (طلبات_مشتركة) ----
@@ -5410,48 +5422,157 @@ function decideRemoteGovRequest_(sharedId, status, rejectReason){
   });
 }
 
-function renderGovApprovals(){
-  const requests = govLoad(GOV_REQUESTS_KEY, []);
-  const body = document.getElementById('govApprovalsBody');
-  function renderRows(remoteItems){
-    const localRows = requests.map((r,i)=>
-      `<tr><td>${r.typeLabel}</td><td>${r.employee||'—'}</td><td>${r.status}</td>`+
-      `<td>`+
-      (r.status==='قيد الانتظار' ?
-        `<button class="action-btn add gov-appr-ok" data-i="${i}" type="button">موافقة</button>`+
-        `<button class="action-btn delete gov-appr-no" data-i="${i}" type="button">رفض</button>`
-        : '—') +
-      `</td></tr>`
-    ).join('');
-    const remoteRows = (remoteItems||[]).map(function(r){
-      return `<tr style="background:#f5f0ff;border-right:4px solid #8e44ad;"><td>${esc(r.typeLabel)}</td>`+
-        `<td>${esc(r.employee||'—')}<br><span style="font-size:.7rem;color:#8e44ad;font-weight:800;">🔗 وارد من ${esc(r._remoteSourceLabel||'')}</span></td>`+
-        `<td>${r.status}</td>`+
-        `<td><button class="action-btn add gov-appr-remote-ok" data-shared="${esc(r.sharedId)}" type="button">موافقة</button>`+
-        `<button class="action-btn delete gov-appr-remote-no" data-shared="${esc(r.sharedId)}" type="button">رفض</button></td></tr>`;
+/* ✅ (22-09-2026) توفيق حالة الطلبات المحلية مع الجسر المشترك: لو طلب اتقدّم من هنا وانتظر
+   الاعتماد، بعدين اتاعتمد/اترفض من نظام تاني (البوابة أو أي من الأنظمة الخمسة) عن طريق
+   sharedId بتاعه (svc6_...) — كان بيفضل شكله "قيد الانتظار" هنا للأبد، لأن النسخة المحلية
+   (localStorage/Firestore بتاع هذا النظام فقط) ما كانتش بتتحدّث إلا لو الاعتماد حصل من جوه
+   هذا النظام نفسه عن طريق syncApprovalToBridge_. الدالة دي بتقارن كل الطلبات المحلية "قيد
+   الانتظار" بحالتها الحقيقية في الشيت المشترك، وتحدّث النسخة المحلية (localStorage + Firestore)
+   لو اتغيّرت — تُستدعى قبل عرض شاشة "قيد الموافقة" وشاشة "طلباتي" على السواء. */
+function reconcileLocalGovRequestsWithBridge_(){
+  const local = govLoad(GOV_REQUESTS_KEY, []);
+  const pendingLocal = local.filter(function(r){ return r.status === 'قيد الانتظار'; });
+  if(!pendingLocal.length) return Promise.resolve(false);
+  return bridgeGet_({ action:'getSharedRequests', status:'approved,rejected' }).then(function(res){
+    const items = (res && Array.isArray(res.items)) ? res.items : [];
+    if(!items.length) return false;
+    const bridgeById = {};
+    items.forEach(function(it){ if(it.sharedId) bridgeById[it.sharedId] = it; });
+    let changed = false;
+    pendingLocal.forEach(function(r){
+      const decided = bridgeById['svc6_' + r.id];
+      if(decided && (decided.status === 'approved' || decided.status === 'rejected')){
+        r.status = decided.status === 'approved' ? 'تمت الموافقة' : 'مرفوض';
+        if(decided.decidedBy) r.decidedBy = decided.decidedBy;
+        if(decided.rejectReason) r.rejectReason = decided.rejectReason;
+        firestoreSaveGovRequest(r);
+        changed = true;
+      }
+    });
+    if(changed) govSave(GOV_REQUESTS_KEY, local);
+    return changed;
+  }).catch(function(e){ console.error('تعذر توفيق حالة الطلبات المحلية مع الجسر المشترك', e); return false; });
+}
+
+
+/* ==================== شاشة الموافقات — بنفس نمط "طلبات قيد الموافقة" في نظام النوبتجيات ====================
+   بدل الجدول المسطّح الواحد اللي كان فيه كل الحالات مع بعض: 4 كروت منفصلة (قيد الموافقة مقسّمة
+   لتصنيفات حسب النوع، معتمدة، مرفوضة، بحث شامل)، بنفس فكرة renderPendingCategoriesHub /
+   renderApprovedRequestsList / renderRejectedRequestsList / renderShiftStatusSearch هناك. */
+const GOV_APPR_CATS = [
+  { key:'leave',      label:'إجازات',                 icon:'🌴' },
+  { key:'permission', label:'أذون',                    icon:'🚪' },
+  { key:'rest',       label:'بدل راحة',                icon:'😴' },
+  { key:'mission',    label:'مأموريات',                icon:'🧳' },
+  { key:'exchange',   label:'مبادلات',                 icon:'🔄' },
+  { key:'other',      label:'طلبات أخرى',              icon:'📌' }
+];
+
+function renderGovApprovals(){ renderGovApprovalsHub(); }
+
+function renderGovApprovalsHub(){
+  const root = document.getElementById('govApprovalsRoot');
+  root.innerHTML = `
+    <div class="hrsub-grid">
+      <div class="hrsub-card" id="govApprHub-pending" style="background:linear-gradient(145deg,#1b5e20,#2e7d32 55%,#66bb6a);">
+        <div class="hrsub-icon">⏳</div>
+        <div class="hrsub-title" style="color:#fff;">طلبات قيد الموافقة</div>
+        <div class="hrsub-desc" style="color:#e8f5e9;">حسب النوع: إجازات • أذون • بدل راحة • مأموريات • مبادلات • طلبات أخرى</div>
+      </div>
+      <div class="hrsub-card" id="govApprHub-approved" style="background:linear-gradient(145deg,#0d3355,#2471a3 55%,#4f8ef0);">
+        <div class="hrsub-icon">✅</div>
+        <div class="hrsub-title" style="color:#fff;">طلبات تم الموافقة عليها</div>
+        <div class="hrsub-desc" style="color:#eaf4ff;">كل الطلبات المعتمدة نهائياً</div>
+      </div>
+      <div class="hrsub-card" id="govApprHub-rejected" style="background:linear-gradient(145deg,#7b1c1c,#c0392b 55%,#e74c3c);">
+        <div class="hrsub-icon">❌</div>
+        <div class="hrsub-title" style="color:#fff;">طلبات مرفوضة</div>
+        <div class="hrsub-desc" style="color:#fdecea;">كل الطلبات التي تم رفضها</div>
+      </div>
+      <div class="hrsub-card" id="govApprHub-search" style="background:linear-gradient(145deg,#3a1257,#8e44ad 55%,#d9a6ff);">
+        <div class="hrsub-icon">🔎</div>
+        <div class="hrsub-title" style="color:#fff;">بحث شامل عن حالة أي طلب</div>
+        <div class="hrsub-desc" style="color:#f5eaff;">قيد الانتظار • معتمد • مرفوض — بحث باسم الموظف على كل الحالات (محلي + وارد من الأنظمة الأخرى)</div>
+      </div>
+    </div>`;
+  document.getElementById('govApprHub-pending').addEventListener('click', renderGovPendingCategoriesHub);
+  document.getElementById('govApprHub-approved').addEventListener('click', function(){ renderGovDecidedList('تمت الموافقة', '✅ طلبات تم الموافقة عليها'); });
+  document.getElementById('govApprHub-rejected').addEventListener('click', function(){ renderGovDecidedList('مرفوض', '❌ طلبات مرفوضة'); });
+  document.getElementById('govApprHub-search').addEventListener('click', renderGovComprehensiveSearch);
+}
+
+function govApprBackBtn(){
+  return `<div class="toolbar"><button class="action-btn page-back gov-appr-back" type="button"><span>↩</span><span>رجوع لشاشة الموافقات</span></button></div>`;
+}
+function govApprWireBack(){
+  const b = document.querySelector('.gov-appr-back');
+  if(b) b.addEventListener('click', renderGovApprovalsHub);
+}
+
+/* ---- طلبات قيد الموافقة: تصنيفات حسب النوع + تصنيف إضافي للوارد من الأنظمة الأخرى ---- */
+function renderGovPendingCategoriesHub(){
+  const root = document.getElementById('govApprovalsRoot');
+  root.innerHTML = govApprBackBtn() + '<h2>⏳ طلبات قيد الموافقة</h2><div class="hrsub-grid" id="govPendCatsGrid"><div style="grid-column:1/-1;text-align:center;">⏳ جاري التحميل...</div></div>';
+  govApprWireBack();
+  reconcileLocalGovRequestsWithBridge_().then(fetchRemoteGovRequests_).then(function(remoteItems){
+    const local = govLoad(GOV_REQUESTS_KEY, []).filter(function(r){ return r.status === 'قيد الانتظار'; });
+    const grid = document.getElementById('govPendCatsGrid');
+    if(!grid) return;
+    const cards = GOV_APPR_CATS.map(function(c){
+      const count = local.filter(function(r){ return r.type === c.key; }).length;
+      return `<div class="hrsub-card gov-pend-cat" data-cat="${c.key}">
+        <div class="hrsub-icon">${c.icon}</div>
+        <div class="hrsub-title">${c.label}</div>
+        <div class="hrsub-desc">${count.toLocaleString('ar-EG')} طلب قيد الانتظار</div>
+      </div>`;
     }).join('');
-    body.innerHTML = (localRows + remoteRows) || '<tr><td colspan="4" style="text-align:center;">لا توجد طلبات حالياً — الطلبات تصل تلقائيًا من شاشة الخدمات العامة والطلبات أو من الأنظمة الأخرى</td></tr>';
+    const remoteCard = `<div class="hrsub-card gov-pend-cat" data-cat="_remote" style="background:linear-gradient(145deg,#3a1257,#8e44ad 55%,#d9a6ff);">
+        <div class="hrsub-icon">🔗</div>
+        <div class="hrsub-title" style="color:#fff;">واردة من أنظمة أخرى</div>
+        <div class="hrsub-desc" style="color:#f5eaff;">${(remoteItems||[]).length.toLocaleString('ar-EG')} طلب قيد الانتظار</div>
+      </div>`;
+    grid.innerHTML = cards + remoteCard;
+    grid.querySelectorAll('.gov-pend-cat').forEach(function(el){
+      el.addEventListener('click', function(){ renderGovPendingCategoryList(el.dataset.cat, remoteItems); });
+    });
+  });
+}
+
+function renderGovPendingCategoryList(catKey, remoteItemsCache){
+  const root = document.getElementById('govApprovalsRoot');
+  const catLabel = catKey === '_remote' ? '🔗 طلبات واردة من أنظمة أخرى' : ((GOV_APPR_CATS.find(function(c){ return c.key===catKey; })||{}).label || catKey);
+  root.innerHTML = `${govApprBackBtn()}<h2>⏳ ${catLabel}</h2>
+    <div class="table-wrap"><div class="table-scroll">
+      <table><thead><tr><th>الطلب</th><th>مقدم الطلب</th><th>الحالة</th><th>إجراء</th></tr></thead>
+        <tbody id="govPendCatBody"><tr><td colspan="4" style="text-align:center;">⏳ جاري التحميل...</td></tr></tbody>
+      </table>
+    </div></div>`;
+  document.querySelector('.gov-appr-back').addEventListener('click', renderGovPendingCategoriesHub);
+  const body = document.getElementById('govPendCatBody');
+  function wireLocalRow(){
     body.querySelectorAll('.gov-appr-ok').forEach(b=>b.addEventListener('click', ()=>{
       const arr = govLoad(GOV_REQUESTS_KEY, []); const i = parseInt(b.dataset.i,10);
-      arr[i].status = 'تمت الموافقة'; govSave(GOV_REQUESTS_KEY, arr); renderGovApprovals();
+      arr[i].status = 'تمت الموافقة'; govSave(GOV_REQUESTS_KEY, arr);
       firestoreSaveGovRequest(arr[i]);
       syncApprovalToBridge_(arr[i], 'approved');
       govLog('موافقة على طلب', arr[i].typeLabel+' — '+(arr[i].employee||''));
+      renderGovPendingCategoryList(catKey, remoteItemsCache);
     }));
     body.querySelectorAll('.gov-appr-no').forEach(b=>b.addEventListener('click', ()=>{
       const arr = govLoad(GOV_REQUESTS_KEY, []); const i = parseInt(b.dataset.i,10);
       const reason = prompt('سبب الرفض (اختياري):','') || '';
-      arr[i].status = 'مرفوض'; govSave(GOV_REQUESTS_KEY, arr); renderGovApprovals();
+      arr[i].status = 'مرفوض'; govSave(GOV_REQUESTS_KEY, arr);
       firestoreSaveGovRequest(arr[i]);
       syncApprovalToBridge_(arr[i], 'rejected', reason);
       govLog('رفض طلب', arr[i].typeLabel+' — '+(arr[i].employee||''));
+      renderGovPendingCategoryList(catKey, remoteItemsCache);
     }));
     body.querySelectorAll('.gov-appr-remote-ok').forEach(b=>b.addEventListener('click', ()=>{
       const sharedId = b.dataset.shared;
       decideRemoteGovRequest_(sharedId, 'approved').then(function(){
         toast('تمت الموافقة — سيظهر التحديث في النظام الأصلي فورًا');
         govLog('موافقة على طلب وارد من نظام آخر', sharedId);
-        renderGovApprovals();
+        renderGovPendingCategoryList(catKey);
       });
     }));
     body.querySelectorAll('.gov-appr-remote-no').forEach(b=>b.addEventListener('click', ()=>{
@@ -5460,13 +5581,93 @@ function renderGovApprovals(){
       decideRemoteGovRequest_(sharedId, 'rejected', reason).then(function(){
         toast('تم الرفض — سيظهر التحديث في النظام الأصلي فورًا');
         govLog('رفض طلب وارد من نظام آخر', sharedId);
-        renderGovApprovals();
+        renderGovPendingCategoryList(catKey);
       });
     }));
   }
-  body.innerHTML = '<tr><td colspan="4" style="text-align:center;">⏳ جاري تحميل الطلبات...</td></tr>';
-  fetchRemoteGovRequests_().then(renderRows);
+  if(catKey === '_remote'){
+    const draw = function(items){
+      const rows = (items||[]).map(function(r){
+        return `<tr style="background:#f5f0ff;border-right:4px solid #8e44ad;"><td>${esc(r.typeLabel)}</td>`+
+          `<td>${esc(r.employee||'—')}<br><span style="font-size:.7rem;color:#8e44ad;font-weight:800;">🔗 وارد من ${esc(r._remoteSourceLabel||'')}</span></td>`+
+          `<td>${r.status}</td>`+
+          `<td><button class="action-btn add gov-appr-remote-ok" data-shared="${esc(r.sharedId)}" type="button">موافقة</button>`+
+          `<button class="action-btn delete gov-appr-remote-no" data-shared="${esc(r.sharedId)}" type="button">رفض</button></td></tr>`;
+      }).join('');
+      body.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;">لا توجد طلبات واردة قيد الانتظار حاليًا</td></tr>';
+      wireLocalRow();
+    };
+    if(remoteItemsCache){ draw(remoteItemsCache); } else { fetchRemoteGovRequests_().then(draw); }
+  } else {
+    const local = govLoad(GOV_REQUESTS_KEY, []);
+    const rows = local.map(function(r, i){ return { r:r, i:i }; })
+      .filter(function(o){ return o.r.status === 'قيد الانتظار' && o.r.type === catKey; })
+      .map(function(o){
+        return `<tr><td>${esc(o.r.typeLabel)}</td><td>${esc(o.r.employee||'—')}</td><td>${o.r.status}</td>`+
+          `<td><button class="action-btn add gov-appr-ok" data-i="${o.i}" type="button">موافقة</button>`+
+          `<button class="action-btn delete gov-appr-no" data-i="${o.i}" type="button">رفض</button></td></tr>`;
+      }).join('');
+    body.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;">لا توجد طلبات قيد الانتظار في هذا التصنيف</td></tr>';
+    wireLocalRow();
+  }
 }
+
+/* ---- طلبات تم الموافقة عليها / طلبات مرفوضة ---- */
+function renderGovDecidedList(statusValue, title){
+  const root = document.getElementById('govApprovalsRoot');
+  root.innerHTML = `${govApprBackBtn()}<h2>${esc(title)}</h2>
+    <div class="table-wrap"><div class="table-scroll">
+      <table><thead><tr><th>التاريخ</th><th>النوع</th><th>مقدم الطلب</th><th>التفاصيل</th>${statusValue==='مرفوض' ? '<th>سبب الرفض</th>' : ''}</tr></thead>
+        <tbody id="govDecidedBody"></tbody>
+      </table>
+    </div></div>`;
+  govApprWireBack();
+  const list = govLoad(GOV_REQUESTS_KEY, []).filter(function(r){ return r.status === statusValue; });
+  const body = document.getElementById('govDecidedBody');
+  body.innerHTML = list.map(function(r){
+    return `<tr><td>${esc(r.date||'—')}</td><td>${esc(r.typeLabel)}</td><td>${esc(r.employee||'—')}</td><td>${esc(r.details||'—')}</td>`+
+      (statusValue==='مرفوض' ? `<td>${esc(r.rejectReason||'—')}</td>` : '') + `</tr>`;
+  }).join('') || `<tr><td colspan="${statusValue==='مرفوض' ? 5 : 4}" style="text-align:center;">لا توجد طلبات هنا حاليًا</td></tr>`;
+}
+
+/* ---- بحث شامل عن حالة أي طلب: باسم الموظف، عبر كل الحالات (محلي + من الشيت المشترك) ---- */
+function renderGovComprehensiveSearch(){
+  const root = document.getElementById('govApprovalsRoot');
+  root.innerHTML = `${govApprBackBtn()}<h2>🔎 بحث شامل عن حالة أي طلب</h2>
+    <div class="search-wrap-inline"><input type="text" id="govApprSearchInp" placeholder="اكتب اسم الموظف..." autocomplete="off" style="width:100%;"></div>
+    <div id="govApprSearchResult" style="margin-top:10px;"></div>`;
+  govApprWireBack();
+  const inp = document.getElementById('govApprSearchInp');
+  const resBox = document.getElementById('govApprSearchResult');
+  let searchTimer = null;
+  inp.addEventListener('input', function(){
+    clearTimeout(searchTimer);
+    const q = inp.value.trim();
+    if(!q){ resBox.innerHTML = ''; return; }
+    searchTimer = setTimeout(function(){ runGovApprSearch(q, resBox); }, 300);
+  });
+}
+function runGovApprSearch(q, resBox){
+  resBox.innerHTML = '<div style="text-align:center;">⏳ جاري البحث...</div>';
+  const local = govLoad(GOV_REQUESTS_KEY, []).filter(function(r){ return (r.employee||'').includes(q); })
+    .map(function(r){ return { typeLabel:r.typeLabel, employee:r.employee, status:r.status, details:r.details, date:r.date, source:'محلي (هذا النظام)' }; });
+  bridgeGet_({ action:'getSharedRequests', status:'pending,pending_supervisor,pending_final,approved,rejected' }).then(function(res){
+    const items = (res && Array.isArray(res.items)) ? res.items : [];
+    const statusLabel = { pending:'قيد الانتظار', pending_supervisor:'قيد الانتظار', pending_final:'قيد الانتظار', approved:'تمت الموافقة', rejected:'مرفوض' };
+    const remote = items.filter(function(it){ return it.sourceSystem !== BRIDGE_SOURCE_SYSTEM && (it.name||'').includes(q); })
+      .map(function(it){ return { typeLabel: it.type||'—', employee: it.name||'', status: statusLabel[it.status]||it.status, details: it.details||'', date: it.date||'', source: GOV_SOURCE_SYSTEM_LABELS[it.sourceSystem] || it.sourceSystem }; });
+    const all = local.concat(remote);
+    if(!all.length){ resBox.innerHTML = '<div style="text-align:center;">لا توجد نتائج مطابقة</div>'; return; }
+    resBox.innerHTML = `<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الموظف</th><th>الحالة</th><th>المصدر</th></tr></thead><tbody>`+
+      all.map(function(r){ return `<tr><td>${esc(r.date)}</td><td>${esc(r.typeLabel)}</td><td>${esc(r.employee)}</td><td>${esc(r.status)}</td><td>${esc(r.source)}</td></tr>`; }).join('') +
+      `</tbody></table></div></div>`;
+  }).catch(function(){
+    resBox.innerHTML = local.length ? `<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الموظف</th><th>الحالة</th><th>المصدر</th></tr></thead><tbody>`+
+      local.map(function(r){ return `<tr><td>${esc(r.date)}</td><td>${esc(r.typeLabel)}</td><td>${esc(r.employee)}</td><td>${esc(r.status)}</td><td>${esc(r.source)}</td></tr>`; }).join('') +
+      `</tbody></table></div></div>` : '<div style="text-align:center;">تعذر الاتصال بالشيت المشترك — عرض النتائج المحلية فقط</div>';
+  });
+}
+
 
 
 document.getElementById('govInquirySearch').addEventListener('input', function(){
@@ -5851,7 +6052,7 @@ function showSvcPanel(name){
     const el = document.getElementById('svcPanel-'+n);
     if(el) el.style.display = (n===name) ? '' : 'none';
   });
-  if(name==='mine') renderSvcList();
+  if(name==='mine') { renderSvcList(); reconcileLocalGovRequestsWithBridge_().then(function(changed){ if(changed) renderSvcList(); }); }
 }
 let svcCurrentType = null;
 function svcOpenType(key){
@@ -5942,7 +6143,7 @@ document.getElementById('svcSubmitBtn').addEventListener('click', ()=>{
   firestoreSaveGovRequest(req);
   pushSharedRequestToBridge_(req);
   if(typeof govLog==='function') govLog('تقديم طلب: ' + req.typeLabel, req.employee);
-  if(typeof renderGovApprovals==='function' && document.getElementById('govApprovalsBody')) renderGovApprovals();
+  if(typeof renderGovApprovals==='function' && document.getElementById('govApprovalsRoot')) renderGovApprovals();
   toast('تم إرسال الطلب بنجاح، بانتظار اعتماد الإدارة');
   showSvcPanel('mine');
 });

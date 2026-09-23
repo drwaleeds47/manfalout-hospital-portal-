@@ -2304,6 +2304,26 @@ let USERS = {
     } catch (e) { console.log('تعذر تحديث حالة الطلب في الشيت المشترك:', e); }
   };
 
+  // ✅ (22-09-2026 — منقول من نظام الترددات والإشغال) نداء موحّد واحد: الباك إند بنفسه بيحدّث حالة
+  // الطلب، ويسجله في سجل الحوكمة لو معتمد، ويخصم الرصيد لو إجازة/إجراء — كل ده من نفس بيانات الطلب
+  // المخزّنة في الشيت المشترك. بيُستخدم هنا فقط لطلبات "واردة من نظام تاني" (فرع _remote_) عشان يصلّح
+  // ثغرة كانت موجودة: اعتماد طلب وارد من نظام تاني من هنا كان بيحدّث الحالة بس من غير ما يخصم الرصيد.
+  // الطلبات المحلية في هذا النظام فضلت على أسلوبها القديم (تسجيل الرصيد محليًا بـ _registerLeaveInSheet/
+  // _registerActionInSheet) عشان تفادي أي احتمال خصم مزدوج من غير كود الباك إند (Code.gs) للتأكد.
+  window.approveSharedRequestBridge = async function(sharedId, status, decidedBy, rejectReason) {
+    if (!GAS_WEB_APP_URL || !sharedId) return { ok: false };
+    try {
+      const res = await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'approveSharedRequest', sharedId, status, decidedBy: decidedBy || '', rejectReason: rejectReason || '' })
+      });
+      return await res.json();
+    } catch (e) {
+      console.log('تعذر اعتماد الطلب عبر الجسر الموحّد:', e);
+      return { ok: false, error: String(e && e.message || e) };
+    }
+  };
+
   // يجيب الطلبات "الواردة من النظام التاني" فقط — تُستخدم لدمجها في شاشة قيد الموافقة المحلية
   window.fetchRemoteSharedRequests = async function(statusList) {
     if (!GAS_WEB_APP_URL) return [];
@@ -2757,6 +2777,22 @@ let USERS = {
       if (type === 'shift') {
         await updateDoc(doc(db, 'shifts', id), { status: 'approved', finalApprovedBy: currentUser, finalApprovedAt: serverTimestamp() });
         if (window._invalidateBooksCache) window._invalidateBooksCache(); // إظهار الجدول المعتمد فورًا في الدفاتر بدون انتظار الكاش
+
+        // ✅ رفع نسخة كاملة من الجدول المعتمد على الجسر المشترك (دفتر_النوبتجيات_الشهري)
+        // عشان لجنة الإشراف والحوكمة (سيستم 7) تقدر تستعلم عن الدفتر كامل بدون أي دخول تاني
+        try {
+          await fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify({
+            action: 'logShiftBook',
+            category: data.category || data.dept || '',
+            type: data.type || '',
+            shiftType: data.shiftType || '',
+            month: data.month || '',
+            year: data.year || '',
+            holidayName: data.holidayName || '',
+            data: data.data || [],
+            status: 'approved'
+          }) });
+        } catch (e) { console.log('تعذر رفع دفتر النوبتجيات للجسر المشترك:', e); }
         
         // إذا كانت نوبتجية عطلة → نسخ البيانات إلى collection مستقلة holiday_shifts
         if (data.type === 'holiday' || data.holidayName) {
@@ -2780,17 +2816,13 @@ let USERS = {
         if (data.supervisorName) await sendNotification(data.supervisorName, '🎉 اعتماد نهائي', `تم اعتماد جدول ${data.category||''} المرفوع من ${data.username||''}`, '', 'success');
         showToast('🎉 تم الاعتماد النهائي وإرسال الإشعارات');
       } else if (String(id).startsWith('_remote_')) {
-        // طلب وارد من نظام الموارد البشرية — الاعتماد النهائي يُسجَّل على الجسر المشترك فقط
+        // طلب وارد من نظام تاني — الاعتماد النهائي بقى بينادي الجسر الموحّد (approveSharedRequestBridge)
+        // بدل (تحديث حالة + تسجيل حوكمة يدوي بدون خصم رصيد): الباك إند دلوقتي بيعمل كل حاجة من نفس
+        // بيانات الطلب في الشيت المشترك — تحديث الحالة + تسجيل الحوكمة + خصم الرصيد فعليًا لو إجازة/إجراء.
+        // ده بيصلّح ثغرة كانت موجودة: اعتماد طلب وارد من نظام تاني من هنا كان بيظهر "معتمد" في كل مكان،
+        // لكن رصيده الفعلي ما كانش بيتخصم أبدًا.
         const sharedId = String(id).replace('_remote_', '');
-        await window.syncSharedRequestStatus(sharedId, 'approved', currentUser);
-        // تسجيل الاعتماد في سجل الحوكمة المركزي (نفس الشيت اللي بيقرأه النظامين)
-        try {
-          await fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify({
-            action: 'logGovernanceEntry', name: data.username || '', type: data.type || '',
-            date: data.date || '', details: data.details || '',
-            source: data._remoteSourceLabel || 'الموارد البشرية', status: 'approved'
-          }) });
-        } catch (e) { console.log('تعذر تسجيل الحوكمة:', e); }
+        await window.approveSharedRequestBridge(sharedId, 'approved', currentUser);
         showToast('🎉 تم الاعتماد النهائي وسيظهر التحديث في النظام الآخر فورًا');
         renderApprovals();
         return;
@@ -2878,9 +2910,10 @@ let USERS = {
         await sendNotification(data.username, '❌ تم رفض طلب النوبتجية', `تم رفض جدول النوبتجية - القسم: ${data.category||''}`, reason, 'danger');
         if (data.supervisorName) await sendNotification(data.supervisorName, '❌ رفض طلب نوبتجية', `تم رفض جدول ${data.category||''} المرفوع من ${data.username||''}`, reason, 'danger');
       } else if (String(id).startsWith('_remote_')) {
-        // طلب وارد من نظام الموارد البشرية — الرفض يُسجَّل على الجسر المشترك فقط
+        // طلب وارد من نظام تاني — نفس الجسر الموحّد (approveSharedRequestBridge) بدل النداء القديم،
+        // عشان يبقى نفس المسار المستخدم في الاعتماد النهائي فوق ويختفي من قيد الاعتماد عند الكل فورًا
         const sharedId = String(id).replace('_remote_', '');
-        await window.syncSharedRequestStatus(sharedId, 'rejected', currentUser, reason);
+        await window.approveSharedRequestBridge(sharedId, 'rejected', currentUser, reason);
         showToast('❌ تم الرفض وسيظهر التحديث في النظام الآخر فورًا');
         renderApprovals();
         return;
