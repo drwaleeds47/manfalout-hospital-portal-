@@ -8085,6 +8085,24 @@ window.syncSharedRequestStatus = async function(sharedId, status, decidedBy, rej
     } catch (e) { console.log('تعذر تحديث حالة الطلب في الشيت المشترك:', e); }
 };
 
+// ✅ (22-09-2026 — منقول من نظام الترددات والإشغال) نداء موحّد واحد بدل (syncSharedRequestStatus + applyApprovedRequestToBridge):
+// الباك إند بنفسه بيحدّث حالة الطلب، ويسجله في سجل الحوكمة لو معتمد، ويخصم الرصيد لو إجازة —
+// كل ده من نفس بيانات الطلب المخزّنة في الشيت المشترك (مش من حسابات محلية في الفرونت إند)،
+// فبيضمن تطابق تام بين اللي اتقدّم واللي اتسجل، ومفيش احتمال نداء ينجح والتاني يفشل بصمت.
+window.approveSharedRequestBridge = async function(sharedId, status, decidedBy, rejectReason) {
+    if (!window.LEAVE_SYNC_URL || !sharedId) return { ok: false };
+    try {
+        const res = await fetch(window.LEAVE_SYNC_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'approveSharedRequest', sharedId, status, decidedBy: decidedBy || '', rejectReason: rejectReason || '' })
+        });
+        return await res.json();
+    } catch (e) {
+        console.log('تعذر اعتماد الطلب عبر الجسر الموحّد:', e);
+        return { ok: false, error: String(e && e.message || e) };
+    }
+};
+
 // يجيب الطلبات الواردة من النظامين التانيين (النوبتجيات + الموارد البشرية) لعرضها هنا في "الإحصاء الطبي والحوكمة"
 window.fetchRemoteSharedRequests = async function(statusList) {
     if (!window.LEAVE_SYNC_URL) return [];
@@ -11371,8 +11389,7 @@ function updateGeneralRequestStatus(key, status) {
         db.ref('general_requests/' + key).update({ status, decidedBy: currentUser?.name || '', decidedAt: Date.now() })
             .then(() => {
                 logAdminActionSafe('تحديث حالة طلب عام', status === 'approved' ? 'اعتماد طلب' : 'رفض طلب');
-                if (data.sharedId) window.syncSharedRequestStatus(data.sharedId, status, currentUser?.name || '');
-                if (status === 'approved') window.applyApprovedRequestToBridge({ ...data, status });
+                if (data.sharedId) window.approveSharedRequestBridge(data.sharedId, status, currentUser?.name || '');
                 renderGeneralRequestsMgmtTable();
             })
             .catch(() => showToast('❌ تعذر تحديث الحالة'));
@@ -11457,10 +11474,9 @@ function updateRemoteSharedRequestStatus(index, status) {
     const r = (window._grMgmtCurrentRows || [])[index];
     if (!r || !r._remote || !r.sharedId) { showToast('❌ تعذر تحديد الطلب'); return; }
     if (status === 'rejected' ? !confirm('تأكيد رفض هذا الطلب؟') : !confirm('تأكيد اعتماد هذا الطلب؟')) return;
-    Promise.resolve(window.syncSharedRequestStatus(r.sharedId, status, currentUser?.name || ''))
+    Promise.resolve(window.approveSharedRequestBridge(r.sharedId, status, currentUser?.name || ''))
         .then(() => {
             logAdminActionSafe('تحديث حالة طلب وارد من ' + (r._remoteSourceLabel || 'نظام آخر'), status === 'approved' ? 'اعتماد طلب' : 'رفض طلب');
-            if (status === 'approved') return window.applyApprovedRequestToBridge({ ...r, status });
         })
         .then(() => { showToast(status === 'approved' ? '✅ تم اعتماد الطلب' : '❌ تم رفض الطلب'); renderGeneralRequestsMgmtTable(); })
         .catch(() => showToast('❌ تعذر تحديث الحالة في الجسر المشترك'));

@@ -3854,7 +3854,10 @@ window.leaveApprovalApprove = async function(id, remoteData) {
       const sharedId = String(id).replace('_remote_', '');
       await window.syncSharedRequestStatus(sharedId, 'approved', currentUser);
       // تسجيل الاعتماد في سجل الحوكمة المركزي (نفس الشيت اللي بيقرأه النظامين)
+      // + خصم الرصيد فعليًا (لو إجازة) أو تسجيل الإجراء (بدل راحة/مأمورية/إذن) — كانت الخطوة دي ناقصة هنا،
+      // فطلب وارد من نظام تاني ومعتمد من هنا كان بيتحدث حالته بس من غير ما يتخصم رصيده فعليًا
       if (remoteData) {
+        try { await window.applyApprovedLeaveToBalance(remoteData); } catch (e) { console.log('تعذر خصم الرصيد للطلب الوارد:', e); }
         try {
           await fetch(window.LEAVE_SYNC_URL, { method: 'POST', body: JSON.stringify({
             action: 'logGovernanceEntry', name: remoteData.username || '', type: remoteData.type || '',
