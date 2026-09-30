@@ -176,7 +176,8 @@ export default {
       // private (مش public) عشان الكاش يكون في متصفح المستخدم نفسه بس، مش على أي شير كاش وسيط
       // 30 دقيقة كفاية تسرّع فتح نفس النظام تاني قريب، من غير ما تأخر ظهور تعديل جديد لمدة طويلة
       const response = new Response(assetResponse.body, assetResponse);
-      response.headers.set('Cache-Control', 'private, max-age=1800');
+      // الكاش بس للردود الناجحة، عشان 404/خطأ قبل رفع الملف ما يتخزنش 30 دقيقة في المتصفح
+      response.headers.set('Cache-Control', assetResponse.ok ? 'private, max-age=1800' : 'no-store');
       return response;
     }
 
