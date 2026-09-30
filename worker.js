@@ -1,11 +1,12 @@
 ﻿// ================== إعدادات ==================
 const SYSTEM_ROUTES = {
-  'sys1': { file: 'الخدمات_العاجله_والحوكمه_محدث.html', roles: ['admin', 'supermanager'] },
-  'sys2': { file: 'نظام_الموارد_البشرية_محدث.html', roles: ['admin', 'supermanager', 'dutymanager'] },
-  'sys3': { file: 'نظام_النوبتجيات_محدث.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor'] },
+  'sys1': { file: 'الخدمات_العاجله_والحوكمه_محدث.html', roles: ['admin', 'supermanager', 'user', 'viewer'] },
+  'sys2': { file: 'نظام_الموارد_البشرية_محدث.html', roles: ['admin', 'supermanager', 'dutymanager', 'user', 'viewer'] },
+  'sys3': { file: 'نظام_النوبتجيات_محدث_v9.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor', 'user', 'viewer'] },
   'sys4': { file: 'الحوكمة_الادارية_والاكلينيكية_محدث.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor', 'viewer', 'user'] },
-  'sys5': { file: 'الترددات_والاشغال_محدث.html', roles: ['admin', 'supermanager', 'dutymanager'] },
+  'sys5': { file: 'الترددات_والاشغال_محدث.html', roles: ['admin', 'supermanager', 'dutymanager', 'user', 'viewer'] },
   'sys6': { file: 'التحول_الرقمي_وتحليل_البيانات_.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor', 'viewer', 'user'] },
+  'sys7': { file: 'لجنه_الاشراف_والحوكمه.html', roles: ['admin', 'supermanager', 'viewer', 'user'] },
 };
 
 // المتعاقدين يرثون افتراضيًا نفس صلاحيات الموظف العادي (user) — نفس القاعدة المطبقة في البوابة
@@ -145,8 +146,8 @@ export default {
       return new Response(null, { status: 302, headers });
     }
 
-    // ----- روابط الأنظمة المباشرة: /open/sys1 .. /open/sys5 (محمية بتسجيل دخول) -----
-    const m = url.pathname.match(/^\/open\/(sys[1-6])\/?$/);
+    // ----- روابط الأنظمة المباشرة: /open/sys1 .. /open/sys7 (محمية بتسجيل دخول) -----
+    const m = url.pathname.match(/^\/open\/(sys[1-7])\/?$/);
     if (m) {
       const cookieToken = getCookie(request, COOKIE_NAME);
       const session = await verifySession(cookieToken, env.AUTH_SECRET);

@@ -8921,101 +8921,116 @@ ${body}
   };
   
   window.doLogin = async function() {
+    const btn = document.querySelector('.btn-login');
+    if (btn && btn.dataset.busy === '1') return; // منع الضغط المزدوج
+    const setBusy = (on) => {
+      if (!btn) return;
+      if (on) { btn.dataset.busy = '1'; btn.dataset.label = btn.innerHTML; btn.innerHTML = '⏳ جاري الدخول...'; btn.style.opacity = '0.75'; }
+      else { btn.dataset.busy = ''; if (btn.dataset.label) btn.innerHTML = btn.dataset.label; btn.style.opacity = ''; }
+    };
+    const showErr = (msg) => {
+      const el = document.getElementById('loginError');
+      el.textContent = msg; el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 3000);
+    };
+
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
     const userType = document.getElementById('userType').value;
 
-    // ── تحميل المستخدمين من Firebase أولاً قبل التحقق ──
-    // هذا يضمن أن أي مستخدم أضافه الأدمن يستطيع تسجيل الدخول فوراً
+    setBusy(true);
     try {
-      const usersSnap = await getDocs(collection(db, 'users'));
-      for (const docSnap of usersSnap.docs) {
-        const d = docSnap.data();
-        if (d.name) {
-          // لو المستند لسه فيه نص الباسورد الصريح (مرحلة مؤقتة لحد تشغيل سكريبت الترحيل) نحوّله لبصمة فورًا
-          const passwordHash = d.passwordHash || (d.password ? await sha256Hex(d.password) : undefined);
-          USERS[d.name] = { passwordHash, type: d.type, dept: d.dept, supervisor: d.supervisor || null };
-        }
+      // ── تحديث بيانات المستخدم من Firebase: مستند واحد بس بدل تحميل مجموعة users كلها ──
+      const applyUserDoc = async (d, key) => {
+        const name = d.name || key;
+        if (!name) return;
+        const passwordHash = d.passwordHash || (d.password ? await sha256Hex(d.password) : undefined);
+        USERS[name] = { passwordHash, type: d.type, dept: d.dept, supervisor: d.supervisor || null };
+      };
+      let fetchedOne = false, fetchFailed = false;
+      try {
+        const one = await getDoc(doc(db, 'users', username));
+        if (one.exists()) { await applyUserDoc(one.data(), username); fetchedOne = true; }
+      } catch (err) { fetchFailed = true; console.log('user doc load error:', err); }
+
+      // لو المستند مش موجود بنفس اسم المستخدم ومفيش نسخة محلية (أو الطلب فشل)، نرجع للتحميل الكامل زي الأول
+      if (!fetchedOne && (fetchFailed || !USERS[username])) {
+        try {
+          const usersSnap = await getDocs(collection(db, 'users'));
+          for (const docSnap of usersSnap.docs) await applyUserDoc(docSnap.data(), docSnap.id);
+        } catch (err) { console.log('users load error:', err); }
       }
-    } catch(e) { console.log('users load error:', e); }
 
-    const user = USERS[username];
-    if (!user) { document.getElementById('loginError').textContent = 'اسم المستخدم غير صحيح'; document.getElementById('loginError').style.display = 'block'; setTimeout(() => document.getElementById('loginError').style.display = 'none', 3000); return; }
+      const user = USERS[username];
+      if (!user) { showErr('اسم المستخدم غير صحيح'); return; }
 
-    // ── التحقق الفعلي: مقارنة مباشرة بالـ passwordHash (نفس منطق الحوكمة الإدارية sys5) ──
-    // ده هو مصدر الحقيقة الوحيد لصحة كلمة المرور. مفيش أي اعتماد على Firebase Auth هنا،
-    // فتغيير الباسورد من الأدمن بيشتغل فورًا من غير Cloud Function ومن غير أي مزامنة.
-    const enteredHash = await sha256Hex(password);
-    if (enteredHash !== user.passwordHash) {
-      document.getElementById('loginError').textContent = 'كلمة المرور غير صحيحة';
-      document.getElementById('loginError').style.display = 'block';
-      setTimeout(() => document.getElementById('loginError').style.display = 'none', 3000);
-      return;
-    }
+      // ── التحقق الفعلي: مقارنة مباشرة بالـ passwordHash ──
+      const enteredHash = await sha256Hex(password);
+      if (enteredHash !== user.passwordHash) { showErr('كلمة المرور غير صحيحة'); return; }
 
-    // ── جلسة Firebase Auth حقيقية بباسورد تقني ثابت (مش باسورد المستخدم) — لدعم Firestore rules فقط ──
-    // لو فشلت لأي سبب، الدخول بيكمل عادي، لأن التحقق الفعلي خلص فوق.
-    try {
-      await ensureFirebaseAuthSession(username);
-      if (auth.currentUser) {
-        try { await setDoc(doc(db, 'uid_map', auth.currentUser.uid), { username }, { merge: true }); }
-        catch(e) { console.warn('⚠️ فشل ربط uid_map عند الدخول - قد تفشل عمليات الحذف/الاعتماد لاحقاً:', e.message); }
+      // نوع المستخدم يتفحص قبل أي اتصال إضافي بالشبكة
+      if (user.type !== userType) { showErr('نوع المستخدم غير مطابق لبياناتك'); return; }
+
+      // ── جلسة Firebase Auth (لدعم Firestore rules) ──
+      try {
+        await ensureFirebaseAuthSession(username);
+        if (auth.currentUser) {
+          try { await setDoc(doc(db, 'uid_map', auth.currentUser.uid), { username }, { merge: true }); }
+          catch (err) { console.warn('⚠️ فشل ربط uid_map عند الدخول - قد تفشل عمليات الحذف/الاعتماد لاحقاً:', err.message); }
+        }
+      } catch (err) {
+        console.warn('Firebase Auth session error (تم تجاهله، الدخول لسه سليم):', err.message);
       }
-    } catch (e) {
-      console.warn('Firebase Auth session error (تم تجاهله، الدخول لسه سليم):', e.message);
-    }
-    if (user.type !== userType) { document.getElementById('loginError').textContent = 'نوع المستخدم غير مطابق لبياناتك'; document.getElementById('loginError').style.display = 'block'; setTimeout(() => document.getElementById('loginError').style.display = 'none', 3000); return; }
-    currentUser = username;
-    currentUserData = user;
-    window.currentUser = username;
-    window.currentUserData = user;
 
-    // ── تحميل التعديلات المحفوظة في Firebase ودمجها مع البيانات الثابتة ──
-    try {
-      const customSnap = await getDocs(collection(db, 'staff_custom'));
-      customSnap.forEach(docSnap => {
-        const d = docSnap.data();
-        if (d.dept && Array.isArray(d.staff)) {
-          DOCTORS_DATA[d.dept] = d.staff;
-        }
-      });
-    } catch(e) { console.log('staff_custom load error:', e); }
+      currentUser = username;
+      currentUserData = user;
+      window.currentUser = username;
+      window.currentUserData = user;
 
-    // ── تحميل تعديلات بيانات الموظفين من Firebase ودمجها ──
-    try {
-      const empSnap = await getDocs(collection(db, 'employees_custom'));
-      empSnap.forEach(docSnap => {
-        const d = docSnap.data();
-        const natId = d.national_id || '';
-        if (!natId) return;
-        // ابحث عن الموظف في EMPLOYEES_DATA بالرقم القومي وحدّث بياناته
-        const idx = EMPLOYEES_DATA.findIndex(e => e.national_id === natId);
-        if (idx !== -1) {
-          Object.assign(EMPLOYEES_DATA[idx], d);
-        }
-      });
-    } catch(e) { console.log('employees_custom load error:', e); }
+      // ── تحميل التعديلات المحفوظة (الاتنين مع بعض بدل ورا بعض) ──
+      await Promise.all([
+        getDocs(collection(db, 'staff_custom')).then(customSnap => {
+          customSnap.forEach(docSnap => {
+            const d = docSnap.data();
+            if (d.dept && Array.isArray(d.staff)) DOCTORS_DATA[d.dept] = d.staff;
+          });
+        }).catch(err => console.log('staff_custom load error:', err)),
+        getDocs(collection(db, 'employees_custom')).then(empSnap => {
+          const byNatId = new Map();
+          EMPLOYEES_DATA.forEach((emp, i) => { if (emp.national_id) byNatId.set(emp.national_id, i); });
+          empSnap.forEach(docSnap => {
+            const d = docSnap.data();
+            const natId = d.national_id || '';
+            if (!natId) return;
+            const idx = byNatId.get(natId);
+            if (idx !== undefined) Object.assign(EMPLOYEES_DATA[idx], d);
+          });
+        }).catch(err => console.log('employees_custom load error:', err))
+      ]);
 
-    document.getElementById('loginPage').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'flex';
-    document.getElementById('welcomeName').textContent = username;
-    document.getElementById('welcomeName2').textContent = username;
-    document.getElementById('userTypeDisplay').textContent = getTypeLabel(user.type);
-    document.getElementById('userDeptDisplay').textContent = user.dept === 'all' ? 'جميع الأقسام' : user.dept;
-    renderIcons();
-    startNotificationListener();
-    updateNotifBadge();
-    showToast(`✅ مرحباً ${username} - نظام الإشعارات مفعل`, 3000);
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'flex';
+      document.getElementById('welcomeName').textContent = username;
+      document.getElementById('welcomeName2').textContent = username;
+      document.getElementById('userTypeDisplay').textContent = getTypeLabel(user.type);
+      document.getElementById('userDeptDisplay').textContent = user.dept === 'all' ? 'جميع الأقسام' : user.dept;
+      renderIcons();
+      startNotificationListener();
+      updateNotifBadge();
+      showToast(`✅ مرحباً ${username} - نظام الإشعارات مفعل`, 3000);
 
-    // ==================== لوحة تحكم الأدمن (الهامش الجانبي) ====================
-    const sbBtn = document.getElementById('sidebarToggleBtn');
-    if (user.type === 'admin') {
-      if (sbBtn) sbBtn.classList.add('visible');
-      document.body.classList.add('has-admin-sidebar');
-      if (typeof renderSidebarMainMenu === 'function') renderSidebarMainMenu();
-    } else {
-      if (sbBtn) sbBtn.classList.remove('visible');
-      document.body.classList.remove('has-admin-sidebar');
+      // ==================== لوحة تحكم الأدمن (الهامش الجانبي) ====================
+      const sbBtn = document.getElementById('sidebarToggleBtn');
+      if (user.type === 'admin') {
+        if (sbBtn) sbBtn.classList.add('visible');
+        document.body.classList.add('has-admin-sidebar');
+        if (typeof renderSidebarMainMenu === 'function') renderSidebarMainMenu();
+      } else {
+        if (sbBtn) sbBtn.classList.remove('visible');
+        document.body.classList.remove('has-admin-sidebar');
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
