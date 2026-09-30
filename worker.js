@@ -6,7 +6,7 @@ const SYSTEM_ROUTES = {
   'sys4': { file: 'الحوكمة_الادارية_والاكلينيكية_محدث.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor', 'viewer', 'user'] },
   'sys5': { file: 'الترددات_والاشغال_محدث.html', roles: ['admin', 'supermanager', 'dutymanager', 'user', 'viewer'] },
   'sys6': { file: 'التحول_الرقمي_وتحليل_البيانات_.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor', 'viewer', 'user'] },
-  'sys7': { file: 'لجنه_الاشراف_والحوكمه.html', roles: ['admin', 'supermanager', 'viewer', 'user'] },
+  'sys7': { file: 'لجنه الاشراف والحوكمه.html', roles: ['admin', 'supermanager', 'viewer', 'user'] },
 };
 
 // المتعاقدين يرثون افتراضيًا نفس صلاحيات الموظف العادي (user) — نفس القاعدة المطبقة في البوابة
