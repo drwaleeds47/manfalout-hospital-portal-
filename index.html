@@ -180,6 +180,44 @@ body::before {
 .fs-fullscreen #qw-stage { min-height:calc(100vh - 110px); }
 .fs-fullscreen .sec2-video-wrap { max-width:1200px; margin:0 auto 22px; }
 .fs-fullscreen .sec2-video-wrap > div { padding-top:56.25%; }
+
+/* ===== ضبط العرض مع لوحة تحكم الأدمن: لا شيء تحتها + أكبر مساحة للفيديو ===== */
+#sec2.fs-fullscreen{
+  display:flex !important; flex-direction:column; overflow:hidden;
+  padding:58px 12px 12px !important;
+}
+#sec2.fs-fullscreen > h4{ margin:0 0 8px !important; flex:0 0 auto; }
+#sec2.fs-fullscreen .sec2-video-wrap{
+  flex:1 1 auto; min-height:0; width:100% !important;
+  max-width:none !important; margin:0 !important;
+}
+#sec2.fs-fullscreen .sec2-video-wrap > div{
+  padding-top:0 !important; height:100%; border-radius:10px;
+}
+@media (min-width:700px){
+  /* العارض يبدأ بعد عرض اللوحة الجانبية فلا يكون أي جزء منه تحتها */
+  body.has-admin-sidebar .fs-fullscreen{
+    left:var(--sbw,300px) !important; right:0 !important;
+    width:calc(100vw - var(--sbw,300px)) !important;
+  }
+  body.has-admin-sidebar .fs-fullscreen .fs-exit-btn{ left:calc(var(--sbw,300px) + 16px); }
+}
+
+/* ===== عرض فيديوهات إدارة المستشفى (الإدارة العليا / الهيكل التنظيمي): بامتلاء الشاشة بجانب لوحة الأدمن ===== */
+#hospitalVideoModal{ padding:0 !important; align-items:stretch; justify-content:stretch; background:#000; backdrop-filter:none; }
+#hospitalVideoModal .modal-box{
+  max-width:none !important; width:100% !important;
+  max-height:none !important; height:100% !important;
+  border-radius:0 !important; margin:0 !important;
+  display:flex; flex-direction:column;
+}
+#hospitalVideoModal .modal-header{ padding-top:8px !important; padding-bottom:8px !important; }
+#hospitalVideoModal .modal-box > div:last-child{ padding:6px !important; }
+#hospitalVideoWrap{
+  width:100% !important; height:100% !important;
+  max-width:none !important; max-height:none !important;
+  aspect-ratio:auto !important; margin:0 !important; border-radius:8px !important;
+}
 /* ===== CARD BASE ===== */
 .sys-card {
   position:relative;border-radius:28px;cursor:pointer;overflow:hidden;
@@ -1884,7 +1922,6 @@ window.addEventListener('DOMContentLoaded', function(){
     <div class="modal-header" style="flex-shrink:0;">
       <h2 id="hospitalVideoTitle">🎖️ الإدارة العليا</h2>
       <div style="display:flex;align-items:center;gap:8px;">
-        <a id="hospitalVideoOpenLink" class="modal-close" title="فتح الفيديو في تبويب جديد" href="#" target="_blank" rel="noopener" style="text-decoration:none;">↗</a>
         <button class="modal-close" title="تكبير / ملء الشاشة" onclick="toggleHospitalVideoFullscreen()">⛶</button>
         <button class="modal-close" onclick="closeHospitalVideoModal()">✕</button>
       </div>
@@ -1894,8 +1931,9 @@ window.addEventListener('DOMContentLoaded', function(){
         <iframe
           id="hospitalVideoFrame"
           data-src=""
+          loading="lazy"
           style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
-          allow="autoplay; fullscreen; encrypted-media"
+          allow="autoplay"
           allowfullscreen>
         </iframe>
       </div>
@@ -3532,20 +3570,20 @@ const ROW1 = [
 
 // الأنظمة الخمسة الفعلية (بتفتح كل نظام كما هو دون أي تعديل فيه) — تظهر داخل أيقونة "الأنظمة المتاحة"
 // إصدار البوابة — يُحدَّث تلقائياً كلما تم تحديث أي نظام من الأنظمة المضمّنة أدناه
-let PORTAL_VERSION = '2026-10-04'; // قيمة افتراضية fallback لحين وصول الرد من GitHub
+let PORTAL_VERSION = '2026-08-26'; // قيمة افتراضية fallback لحين وصول الرد من GitHub
 const ALL_SYSTEMS = [
-  { name:'الخدمات العاجله ومستشارك القانوني', emoji:'⚖️', color:'c-purple', file:'الخدمات العاجله ومستشارك القانوني.html', ghFile:'الخدمات_العاجله_والحوكمه_محدث.html', route:'sys1', roles:['admin','supermanager','user','viewer'], ver:'2026-08-29' },
-  { name:'منظومه الموارد البشريه', emoji:'📁', color:'c-red', file:'منظومه الموارد البشريه.html', ghFile:'نظام_الموارد_البشرية_محدث.html', route:'sys2', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-08-29' },
-  { name:'منظومه النوبتجيات والسهر', emoji:'📅', color:'c-gold', file:'منظومه النوبتجيات والسهر.html', ghFile:'نظام_النوبتجيات_محدث_v14.html', route:'sys3', roles:['admin','supermanager','dutymanager','supervisor','user','viewer'], ver:'2026-10-04' },
-  { name:'الحوكمة الادارية والاكلينيكية', emoji:'🏛️', color:'c-teal', file:'الحوكمة الادارية والاكلينيكية.html', ghFile:'الحوكمة_الادارية_والاكلينيكية_محدث.html', route:'sys4', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-08-29' },
-  { name:'منظومه الترددات والإشغال', emoji:'📊', color:'c-magenta', file:'منظومه الترددات والإشغال.html', ghFile:'الترددات_والاشغال_محدث.html', route:'sys5', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-08-29' },
-  { name:'التحول الرقمي وتحليل البيانات', emoji:'💻', color:'c-blue', file:'التحول الرقمي وتحليل البيانات.html', ghFile:'التحول_الرقمي_وتحليل_البيانات_.html', route:'sys6', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-09-16' },
-  { name:'لجنة الإشراف والحوكمة', emoji:'🔍', color:'c-green', file:'لجنة الإشراف والحوكمة.html', ghFile:'لجنة_الاشراف_والحوكمة_v8.html', route:'sys7', roles:['admin','supermanager','viewer','user'], ver:'2026-10-04' },
+  { name:'الخدمات العاجله ومستشارك القانوني', emoji:'⚖️', color:'c-purple', file:'الخدمات العاجله ومستشارك القانوني.html', ghFile:'sys1_urgent_services.html', route:'sys1', roles:['admin','supermanager','user','viewer'], ver:'2026-08-29' },
+  { name:'منظومه الموارد البشريه', emoji:'📁', color:'c-red', file:'منظومه الموارد البشريه.html', ghFile:'sys2_hr.html', route:'sys2', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-08-29' },
+  { name:'منظومه النوبتجيات والسهر', emoji:'📅', color:'c-gold', file:'منظومه النوبتجيات والسهر.html', ghFile:'sys3_shifts.html', route:'sys3', roles:['admin','supermanager','dutymanager','supervisor','user','viewer'], ver:'2026-09-16' },
+  { name:'الحوكمة الادارية والاكلينيكية', emoji:'🏛️', color:'c-teal', file:'الحوكمة الادارية والاكلينيكية.html', ghFile:'sys4_governance.html', route:'sys4', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-08-29' },
+  { name:'منظومه الترددات والإشغال', emoji:'📊', color:'c-magenta', file:'منظومه الترددات والإشغال.html', ghFile:'sys5_frequencies.html', route:'sys5', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-08-29' },
+  { name:'التحول الرقمي وتحليل البيانات', emoji:'💻', color:'c-blue', file:'التحول الرقمي وتحليل البيانات.html', ghFile:'sys6_digital_transformation.html', route:'sys6', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-09-16' },
+  { name:'لجنة الإشراف والحوكمة', emoji:'🔍', color:'c-green', file:'لجنة الإشراف والحوكمة.html', ghFile:'sys7_oversight_committee.html', route:'sys7', roles:['admin','supermanager','viewer','user'], ver:'2026-09-30' },
 ];
 
 // ===== تحديث تلقائي لتواريخ "آخر تحديث" من GitHub API (بدل التعديل اليدوي كل مرة) =====
 // ⚠️ لازم تتأكد إن اسم المستخدم واسم الـ repo واسم الـ branch مطابقين لصفحة GitHub بتاعتك بالظبط
-const GH_OWNER  = 'drwaleeds47';
+const GH_OWNER  = 'drwaleeds43-jpg';
 const GH_REPO   = 'manfalout-hospital-portal-';
 const GH_BRANCH = 'main';
 const GH_VER_CACHE_KEY = 'ghVerCache_v1';
@@ -3605,7 +3643,7 @@ window.addEventListener('DOMContentLoaded', () => { refreshAllSystemsVersions();
 
 // ===== "إدارة المستشفى ورؤساء الأقسام" — أيقونات مستقلة، كل أيقونة تفتح عارض عروض (Gallery) فاخر =====
 const HOSPITAL_ADMIN_ITEMS = [
-  { id:'topmgmt',   name:'الإدارة العليا',        emoji:'🎖️', color:'c-blue',  video:'1QLyidc3vTeX1QOxrePRKBWbZDGk3u1kA' },
+  { id:'topmgmt',   name:'الإدارة العليا',        emoji:'🎖️', color:'c-blue',  video:'13IFBROAAp_n0GQiPGoGZsNgynO5pNgkj' },
   { id:'orgchart',  name:'الهيكل التنظيمي واللجان', emoji:'🗂️', color:'c-green', video:'1cBnIdLK0cs8UPVzi2pK-8mSPtJGw4-_d' },
 ];
 
@@ -4313,7 +4351,7 @@ function renderSidebarMainMenu(){
     const style = SIDEBAR_ICON_STYLES[idx % SIDEBAR_ICON_STYLES.length];
     return `
     <div class="sidebar-main-item">
-      <button class="sidebar-main-btn" onclick="${item.fn}();closeSidebarOnMobile()">
+      <button class="sidebar-main-btn" onclick="sidebarGo('${item.fn}')">
         <span class="sm-icon" style="background:${style.bg}">${item.icon}</span>
         <span class="sm-label">${item.label}</span>
       </button>
@@ -4321,7 +4359,15 @@ function renderSidebarMainMenu(){
   }).join('');
 }
 function closeSidebarOnMobile(){
-  if (window.innerWidth < 900) closeSidebar();
+  if (window.innerWidth < 700) closeSidebar();
+}
+// الهامش ثابت: أي قسم يتضغط عليه يقفل المودال المفتوح الأول وبعدين يفتح القسم الجديد (من غير ما يتراكموا فوق بعض)
+function sidebarGo(fn){
+  ['closePermissionsModal','closeHospitalAdminModal','closeAllSystemsModal','closeInfoModal','closeHospitalVideoModal','closePdfGallery'].forEach(function(n){
+    if (typeof window[n] === 'function') { try { window[n](); } catch(e){} }
+  });
+  if (typeof window[fn] === 'function') window[fn]();
+  closeSidebarOnMobile();
 }
 function openSidebar(){
   if (!currentUser || currentUser.type !== 'admin') return;
@@ -4380,10 +4426,19 @@ function buildGrid() {
 }
 
 // ===== تبويب إدارة المستخدمين (داخل مودال صلاحيات المستخدمين) =====
+// تحديث عدد المستخدمين على دفتر "إدارة المستخدمين" (سواء اتحوّل لدفتر أو لسه كارت عادي)
+function updatePermHubCount(){
+  const card = document.querySelector('#permHubGrid [data-hub="users"]');
+  if (!card) return;
+  const n = (typeof allUsersData !== 'undefined' && allUsersData) ? allUsersData.length : 0;
+  const cap = card.querySelector('.bkc-cap');
+  if (cap) { cap.textContent = 'إدارة المستخدمين (' + n + ')'; return; }
+  const nm = card.querySelector('.sub-name');
+  if (nm) nm.textContent = 'إدارة\nالمستخدمين (' + n + ')';
+}
 function refreshUsersData(){
   allUsersData = Object.entries(USERS).map(([name,u]) => ({name,...u}));
-  const c = document.getElementById('modalCount'); if (c) c.textContent = allUsersData.length;
-  try{ const uc = document.querySelector('#permHubGrid .bkc-cap'); if (uc && /^إدارة\s*المستخدمين/.test(uc.textContent)) uc.textContent = 'إدارة المستخدمين (' + allUsersData.length + ')'; }catch(e){}
+  updatePermHubCount();
   renderUsersTable(allUsersData);
 }
 
@@ -4509,9 +4564,10 @@ function renderPermHubGrid(){
   PERM_HUB_ITEMS.forEach(item => {
     const card = document.createElement('div');
     card.className = 'sub-card ' + item.color;
+    card.setAttribute('data-hub', item.id);
     card.innerHTML = `
       <div class="sub-emoji">${item.emoji}</div>
-      <div class="sub-name">${item.name}${item.id === 'users' ? ' (' + ((typeof allUsersData !== 'undefined' && allUsersData.length) || 0) + ')' : ''}</div>
+      <div class="sub-name">${item.name}${item.id === 'users' ? ' (' + ((typeof allUsersData !== 'undefined' && allUsersData) ? allUsersData.length : 0) + ')' : ''}</div>
       <div class="sub-hint">اضغط للعرض</div>
     `;
     card.addEventListener('click', () => switchPermTab(item.id));
@@ -5076,7 +5132,6 @@ function openHospitalVideoModal(item){
   const frame = document.getElementById('hospitalVideoFrame');
   frame.dataset.src = 'https://drive.google.com/file/d/' + item.video + '/preview';
   frame.src = frame.dataset.src;
-  const _ol = document.getElementById('hospitalVideoOpenLink'); if (_ol) _ol.href = 'https://drive.google.com/file/d/' + item.video + '/view';
   document.getElementById('hospitalVideoModal').classList.add('show');
 }
 function toggleHospitalVideoFullscreen(){
@@ -5263,24 +5318,15 @@ function attachSystemFrameFallback(frame, sysEntry) {
     if (frame.dataset.fallbackUsed === '1') return; // دي تحميلة النسخة الاحتياطية نفسها
     try {
       const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-      if (looksLikeBrokenSystemPage(doc)) {
-        doFallback('broken content detected');
-      } else {
-        // النظام اتحمّل سليم من الـ Worker: نوقف مؤقت الـ timeout عشان ما يستبدلش النظام بنسخة GitHub بعد 25 ثانية
-        settled = true;
-        clearTimeout(timerId);
-      }
+      if (looksLikeBrokenSystemPage(doc)) doFallback('broken content detected');
     } catch (e) {
-      // لو مقدرناش نقرا المحتوى لكن حدث load اتنفذ يبقى اتحمّل فعلًا
-      settled = true;
-      clearTimeout(timerId);
       // Cross-origin أو تعذر القراءة - مفيش داعي نعتبرها خطأ، سيبها زي ما هي
     }
   };
-  // 60 ثانية: ملف لجنة الإشراف حجمه ~4.4 ميجا وممكن يتأخر على نت بطيء. المؤقت بيتلغي أول ما النظام يخلّص تحميل.
+  // كانت 9 ثواني — قليلة جدًا لملفات بالحجم ده (1-3.4 ميجا) على نت بطيء، فرفعناها لـ 25 ثانية
   const timerId = setTimeout(function() {
     if (!settled && frame.dataset.fallbackUsed !== '1') doFallback('timeout');
-  }, 60000);
+  }, 25000);
 
   frame.addEventListener('error', onError);
   frame.addEventListener('load', onLoad);
@@ -5387,9 +5433,9 @@ html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-top{background:linear-gradient(180deg,va
 html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-top span{display:block}
 html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-img{position:relative;flex:1 1 auto;min-height:0;background:linear-gradient(160deg,var(--b),var(--a))}
 html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-img::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,var(--a))}
-html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-ic{position:absolute;z-index:2;top:50%;left:50%;transform:translate(-50%,-50%);width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:3.3rem;line-height:1;color:#3b2a00;background:radial-gradient(circle at 35% 30%,#fff3c4,#f2c94c 60%,#b8860b);box-shadow:inset 0 0 0 2px #fff6d6;overflow:hidden}
+html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-ic{position:absolute;z-index:2;top:50%;left:50%;transform:translate(-50%,-50%);width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;line-height:1;color:#3b2a00;background:radial-gradient(circle at 35% 30%,#fff3c4,#f2c94c 60%,#b8860b);box-shadow:inset 0 0 0 2px #fff6d6;overflow:hidden}
 html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-ic img{width:70%;height:70%;object-fit:contain}
-html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-ic i{font-size:2.6rem;color:#3b2a00}
+html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-ic i{font-size:1.5rem;color:#3b2a00}
 html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-name{background:linear-gradient(180deg,rgba(0,0,0,.25),var(--a));padding:8px 6px 6px;border-top:2px solid #f2c94c;line-height:1.4}
 html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-name small{display:block;color:#f2c94c;font-family:'Reem Kufi','Cairo',sans-serif;font-weight:700;font-size:.7rem;margin-bottom:3px}
 html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-cap{display:inline-block;max-width:100%;box-sizing:border-box;font-family:'Lalezar','Cairo',sans-serif;font-weight:400;font-size:1.4rem;letter-spacing:.2px;line-height:1.3;color:#1a0b2e;border:3px solid #fff;border-radius:24px;padding:6px 12px;background:linear-gradient(120deg,var(--cap) 0%,var(--cap2) 100%);word-break:break-word}
@@ -5401,7 +5447,7 @@ html body .bk-cv.bk-cv.bk-cv.bk-cv.bk-file .bkc-open{pointer-events:auto;display
 html body .bk-cv.bk-cv.bk-cv.bk-cv.bk-file .bkc-open .file-item-actions{display:flex!important;flex-wrap:wrap;gap:3px;justify-content:center;margin:0!important;padding:0!important;width:100%}
 html body .bk-cv.bk-cv.bk-cv.bk-cv.bk-file .bkc-open .fi-btn{font-size:.62rem!important;padding:2px 6px!important;margin:0!important;line-height:1.5;cursor:pointer}
 html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-cap.long{font-size:1.12rem}
-@media (max-width:640px){html body .bk-cv.bk-cv.bk-cv.bk-cv{width:min(100%,185px)!important}html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-ic{width:70px;height:70px;font-size:2.4rem}html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-cap{font-size:1.15rem}}
+@media (max-width:640px){html body .bk-cv.bk-cv.bk-cv.bk-cv{width:min(100%,185px)!important}html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-ic{width:46px;height:46px;font-size:1.4rem}html body .bk-cv.bk-cv.bk-cv.bk-cv .bkc-cap{font-size:1.15rem}}
 @media print{html body .bk-wood.bk-wood.bk-wood{background:none!important;border:0!important;box-shadow:none!important}html body .bk-cv.bk-cv.bk-cv.bk-cv::before{display:none}}
 
 /* ---- توافق مع ستايلات النظام الأصلية (تعطيل زخارف ::before القديمة وفرض شكل الدفتر) ---- */
@@ -5431,8 +5477,6 @@ html body .bk-cv .bkc-lock{position:absolute;z-index:6;top:10px;left:10px;font-s
 
 /* ---- كتب كاملة: مقاس ثابت للكتاب عشان صفوف الشبكة ما تنضغطش وتتداخل الكتب ---- */
 html body .bk-wood.bk-wood.bk-wood>.bk-cv.bk-cv.bk-cv.bk-cv{width:235px!important;max-width:100%!important;height:329px!important;aspect-ratio:auto!important;margin:0 auto 34px!important}
-#hospitalAdminGrid.bk-wood,#permHubGrid.bk-wood,#allSystemsGrid.bk-wood{width:100%!important;box-sizing:border-box!important;margin-left:auto!important;margin-right:auto!important}
-#hospitalAdminGrid.bk-wood{max-width:640px!important}
 html body .bk-wood.bk-wood.bk-wood.sub-grid{grid-template-columns:repeat(auto-fit,minmax(235px,1fr))!important;row-gap:22px!important;align-content:start!important;padding:28px 22px 12px!important}
 html body .sub-grid .sub-card.bk-cv.bk-cv.bk-cv.bk-cv.row-edge-start,html body .sub-grid .sub-card.bk-cv.bk-cv.bk-cv.bk-cv.row-edge-end,html body .sub-grid .sub-card.bk-cv.bk-cv.bk-cv.bk-cv.row-edge-full{grid-column:auto!important}
 html body .sub-card.bk-cv.bk-cv.bk-cv.bk-cv .bkc-cap{font-size:1.3rem}
@@ -5450,18 +5494,6 @@ html body .bk-cv.bk-act .bkc-open{display:flex!important;flex-direction:column;g
 html body .bk-cv.bk-act .bkc-open>div,html body .bk-cv.bk-act .bkc-open .bk-act-row{display:flex!important;flex-wrap:wrap;gap:3px!important;justify-content:center;margin:0!important;padding:0!important;width:100%}
 html body .bk-cv.bk-act .bkc-open button,html body .bk-cv.bk-act .bkc-open a,html body .bk-cv.bk-act .bkc-open span{flex:1 1 auto;margin:0!important;font-family:'Noto Kufi Arabic','Cairo',sans-serif;font-size:.64rem!important;font-weight:900;line-height:1.5;text-align:center;border:1.5px solid #000;box-sizing:border-box}
 @media (max-width:640px){html body .bk-cv.bk-act{aspect-ratio:3/5.8!important}}
-
-/* ===== FIX (scroll + لوحة الأدمن) ===== */
-/* شبكات الكتب كانت مباشرة جوه .modal-box (overflow:hidden) من غير scroll فكانت بتتقص */
-.modal-box > .sub-grid,#permHubGrid,#hospitalAdminGrid{overflow-y:auto!important;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch;}
-/* تبويبات إدارة المستخدمين/الصلاحيات/السجل/الإحصاء: scroll للتبويب نفسه (طولي وعرضي للجداول) */
-#permTabUsers,#permTabPerm,#permTabLog,#permTabStats{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;}
-#permissionsModal .modal-body{max-height:none;overflow:visible;}
-#permissionsModal .modal-box,#hospitalAdminModal .modal-box{max-height:92vh;}
-.modal-overlay{overscroll-behavior:contain;}
-/* زر ⚙️ بتاع لوحة الأدمن كان تحت المودالات وعارض الصفحات (z-index 500) في الشاشات الصغيرة */
-.btn-sidebar-open{z-index:1500!important;}
-.modal-box{touch-action:pan-y;}
 </style>
 <script id="bk-cover-script">
 (function(){
@@ -5624,5 +5656,157 @@ html body .bk-cv.bk-act .bkc-open button,html body .bk-cv.bk-act .bkc-open a,htm
   if(document.readyState!=='loading')later();else document.addEventListener('DOMContentLoaded',later);
 })();
 </script>
+
+<!-- ===== bk-cover-art: صورة معبّرة على كل دفتر تعكس عمله (تعمم على كل الأغلفة والأيقونات) ===== -->
+<style id="bk-cover-art-css">
+html body .bka{position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block;pointer-events:none}
+.bka .w{fill:#fff}.bka .c{fill:var(--c,#fff)}.bka .g{fill:#ffd24a}.bka .r{fill:#e8453c}.bka .d{fill:var(--a,#222)}
+.bka .k{fill:none;stroke:#fff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.bka .sp{fill:#fff;opacity:.85}
+.bka{filter:drop-shadow(0 3px 3px rgba(0,0,0,.28))}
+html body .bk-art .bkc-ic,html body .bk-art .bk-t-ic{top:auto!important;bottom:7px!important;left:8px!important;right:auto!important;transform:none!important;width:32px!important;height:32px!important;font-size:1rem!important;z-index:3}
+html body .bk-art .bkc-ic i,html body .bk-art .bk-t-ic i{font-size:.95rem}
+html body .bk-art .bkc-img,html body .bk-art .bk-t-img{overflow:hidden}
+</style>
+<script id="bk-cover-art-js">
+(function(){
+  var G='<path d="M0-6l1.6 4.4L6 0l-4.4 1.6L0 6l-1.6-4.4L-6 0l4.4-1.6z" class="sp"/>';
+  var SC={
+    amb:'<g transform="translate(-10 0)"><rect x="30" y="66" width="96" height="46" rx="8" class="w"/><path d="M126 80h22q8 0 13 7l8 12v13h-43z" class="w"/><path d="M134 86h12l9 12h-21z" class="c"/><rect x="30" y="100" width="141" height="7" class="r"/><path d="M69 72h8v9h9v8h-9v9h-8v-9h-9v-8h9z" class="r"/><rect x="70" y="56" width="22" height="10" rx="4" class="g"/><path d="M62 48l-6-8M81 46v-9M100 48l6-8" class="k" style="stroke:#ffd24a;stroke-width:3"/><circle cx="56" cy="114" r="11" class="d"/><circle cx="56" cy="114" r="4.5" class="c"/><circle cx="144" cy="114" r="11" class="d"/><circle cx="144" cy="114" r="4.5" class="c"/></g>',
+    legal:'<path d="M100 34v78M68 114h64M56 50h88" class="k"/><circle cx="100" cy="32" r="6" class="g"/><path d="M56 50l-17 34M56 50l17 34M144 50l-17 34M144 50l17 34" class="k" style="stroke-width:2.5"/><path d="M36 84h40a20 11 0 0 1-40 0zM124 84h40a20 11 0 0 1-40 0z" class="g"/>',
+    hr:'<circle cx="100" cy="52" r="15" class="w"/><path d="M72 110a28 32 0 0 1 56 0z" class="w"/><circle cx="52" cy="66" r="11" class="c"/><path d="M30 110a22 26 0 0 1 44 0z" class="c"/><circle cx="148" cy="66" r="11" class="c"/><path d="M126 110a22 26 0 0 1 44 0z" class="c"/><rect x="88" y="82" width="24" height="17" rx="3" class="g"/><path d="M93 89h14M93 94h9" class="k" style="stroke:#7a5200;stroke-width:2"/>',
+    shift:'<rect x="44" y="38" width="112" height="82" rx="9" class="w"/><path d="M44 47a9 9 0 0 1 9-9h94a9 9 0 0 1 9 9v10H44z" class="d"/><path d="M68 32v12M132 32v12" class="k" style="stroke:#ffd24a"/><path d="M58 68h14v11H58zM80 68h14v11H80zM102 68h14v11h-14zM124 68h14v11h-14zM58 88h14v11H58zM80 88h14v11H80zM124 88h14v11h-14z" class="c"/><rect x="102" y="88" width="14" height="11" class="g"/><path d="M166 24a13 13 0 1 0 11 20a10 10 0 0 1-11-20z" class="g"/><circle cx="28" cy="38" r="8" class="g"/>',
+    bed:'<rect x="26" y="96" width="92" height="9" rx="3" class="w"/><rect x="26" y="74" width="9" height="42" rx="3" class="w"/><rect x="110" y="86" width="9" height="30" rx="3" class="w"/><path d="M38 96v-9q0-8 8-8h20q8 0 8 8v9z" class="c"/><rect x="72" y="80" width="38" height="16" rx="5" class="c"/><circle cx="52" cy="73" r="8" class="g"/><path d="M134 116V84h12v32zM150 116V62h12v54zM166 116V92h12v24z" class="g"/><path d="M130 116h52" class="k" style="stroke-width:3"/>',
+    contract:'<rect x="58" y="30" width="78" height="94" rx="7" class="w"/><path d="M72 50h50M72 62h50M72 74h34" class="k" style="stroke:var(--b);stroke-width:4"/><circle cx="124" cy="104" r="17" class="r"/><circle cx="124" cy="104" r="11" fill="none" stroke="#fff" stroke-width="2"/><path d="M118 104l5 5 9-10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M142 90l30-30 8 8-30 30-12 4z" class="g"/>',
+    money:'<g class="g"><ellipse cx="70" cy="108" rx="26" ry="9"/><ellipse cx="70" cy="96" rx="26" ry="9"/><ellipse cx="70" cy="84" rx="26" ry="9"/></g><ellipse cx="70" cy="82" rx="26" ry="9" fill="#fff0a8"/><circle cx="132" cy="70" r="26" class="g"/><circle cx="132" cy="70" r="19" fill="none" stroke="#b8860b" stroke-width="3"/><path d="M132 58v24M126 64h10q5 0 5 5t-5 5h-8" fill="none" stroke="#b8860b" stroke-width="3" stroke-linecap="round"/>',
+    fix:'<circle cx="84" cy="76" r="32" fill="none" stroke="#fff" stroke-width="12" stroke-dasharray="10 9.1"/><circle cx="84" cy="76" r="26" class="w"/><circle cx="84" cy="76" r="11" class="d"/><path d="M118 114l38-38" class="k" style="stroke:#ffd24a;stroke-width:9"/><circle cx="160" cy="70" r="13" class="g"/><circle cx="165" cy="65" r="6" class="d"/>',
+    lab:'<path d="M90 32h20M94 32v32L66 108q-6 12 8 12h52q14 0 8-12l-28-44V32" class="k"/><path d="M76 96h48l8 14q4 8-6 8H74q-10 0-6-8z" class="g"/><circle cx="96" cy="86" r="4" class="c"/><circle cx="108" cy="76" r="3" class="c"/><circle cx="102" cy="64" r="2.5" class="c"/><circle cx="150" cy="52" r="10" class="c"/><circle cx="46" cy="58" r="7" class="c"/>',
+    pill:'<g transform="rotate(-35 90 76)"><rect x="40" y="58" width="100" height="36" rx="18" class="w"/><path d="M90 58h32a18 18 0 0 1 0 36H90z" class="r"/></g><rect x="130" y="62" width="40" height="52" rx="6" class="w"/><rect x="128" y="52" width="44" height="14" rx="4" class="g"/><path d="M150 77v22M139 88h22" class="k" style="stroke:#e8453c;stroke-width:6"/>',
+    heart:'<path d="M100 118C52 86 40 62 52 46c12-14 34-8 48 8c14-16 36-22 48-8c12 16 0 40-48 72z" class="r"/><path d="M20 84h42l10-22 14 40 12-26h90" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M158 30h8v8h8v8h-8v8h-8v-8h-8v-8h8z" class="g"/>',
+    learn:'<path d="M100 38l66 26-66 26-66-26z" class="w"/><path d="M62 78v20q38 20 76 0V78l-38 15z" class="c"/><path d="M158 68v32" class="k" style="stroke:#ffd24a;stroke-width:4"/><circle cx="158" cy="104" r="6" class="g"/><path d="M40 120h120" class="k" style="stroke-width:3;opacity:.6"/>',
+    chat:'<rect x="24" y="36" width="104" height="54" rx="13" class="w"/><path d="M48 90l-8 16 24-16z" class="w"/><path d="M42 56h64M42 72h42" class="k" style="stroke:var(--b);stroke-width:5"/><rect x="108" y="82" width="70" height="34" rx="12" class="g"/><path d="M158 116l8 12v-12z" class="g"/><circle cx="127" cy="99" r="3.5" class="d"/><circle cx="143" cy="99" r="3.5" class="d"/><circle cx="159" cy="99" r="3.5" class="d"/>',
+    data:'<rect x="36" y="34" width="128" height="78" rx="9" class="w"/><rect x="44" y="42" width="112" height="62" rx="4" class="d"/><path d="M58 100v-4M80 100v-10M102 100v-7M124 100v-14M146 100v-9" class="k" style="stroke:var(--c);stroke-width:6"/><path d="M54 84l20-20 16 12 24-28 26 16 8-10" fill="none" stroke="#ffd24a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M84 112l-6 12h44l-6-12z" class="w"/>',
+    db:'<path d="M58 40v70a42 12 0 0 0 84 0V40z" class="w"/><ellipse cx="100" cy="40" rx="42" ry="12" class="c"/><path d="M58 64a42 12 0 0 0 84 0M58 88a42 12 0 0 0 84 0" fill="none" stroke="var(--b)" stroke-width="3"/><circle cx="76" cy="52" r="3" class="g"/><circle cx="76" cy="76" r="3" class="g"/><circle cx="76" cy="100" r="3" class="g"/><path d="M92 76h34M92 100h24M92 52h34" class="k" style="stroke:var(--b);stroke-width:3"/>',
+    user:'<circle cx="76" cy="52" r="16" class="w"/><path d="M46 112a30 34 0 0 1 60 0z" class="w"/><rect x="116" y="76" width="50" height="40" rx="7" class="g"/><path d="M126 76v-10a15 15 0 0 1 30 0v10" fill="none" stroke="#fff" stroke-width="7"/><circle cx="141" cy="94" r="5" class="d"/><path d="M141 97v8" class="k" style="stroke:var(--a);stroke-width:4"/>',
+    shield:'<path d="M100 28l48 16v34c0 28-19 44-48 56c-29-12-48-28-48-56V44z" class="w"/><path d="M100 28l48 16v34c0 28-19 44-48 56z" class="c"/><path d="M76 78l17 17 33-36" fill="none" stroke="#1f9d62" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><circle cx="34" cy="50" r="6" class="g"/><circle cx="168" cy="96" r="6" class="g"/>',
+    watch:'<rect x="38" y="32" width="84" height="92" rx="7" class="w"/><path d="M50 52l5 5 9-10M50 76l5 5 9-10M50 100l5 5 9-10" fill="none" stroke="#1f9d62" stroke-width="4" stroke-linecap="round"/><path d="M74 52h36M74 76h36M74 100h24" class="k" style="stroke:var(--b);stroke-width:4"/><circle cx="130" cy="82" r="24" fill="rgba(255,255,255,.3)" stroke="#ffd24a" stroke-width="8"/><path d="M148 100l22 22" class="k" style="stroke:#ffd24a;stroke-width:10"/>',
+    book:'<path d="M100 44c-14-10-38-12-60-6v70c22-6 46-4 60 6z" class="w"/><path d="M100 44c14-10 38-12 60-6v70c-22-6-46-4-60 6z" class="c"/><path d="M100 44v70" class="k" style="stroke:var(--a);stroke-width:3"/><path d="M64 62h8v8h8v8h-8v8h-8v-8h-8v-8h8z" class="r"/><path d="M118 62h28M118 76h28M118 90h20" class="k" style="stroke:var(--b);stroke-width:4"/>'
+  };
+  /* ترتيب الأولوية: الأخص أولاً */
+  var MAP=[
+    ['legal',/قانون|مستشار|تحقيق|مخالف|جزاء|قضاي|⚖/],
+    ['amb',/طوارئ|عاجل|اسعاف|استقبال|حوادث|انقاذ|🚑|🚨/],
+    ['user',/مستخدم|صلاحي|حسابات|تسجيل دخول|امان|حمايه|🔐|🔒|👤|user/],
+    ['db',/قاعده|ارشيف|سجلات|ملفات|مستندات|وثائق|🗄|🗃|🗂|database/],
+    ['shift',/نوبتج|سهر|مناوب|ورديه|جدول|🗓|📅/],
+    ['bed',/اشغال|سرير|اسره|ترددات|عيادات|حجز|رقود|🛏|bed/],
+    ['hr',/موارد بشريه|عامل|موظف|تكليف|اجاز|حضور|انصراف|تعيين|ترقي|معاش|بصمه|كادر|افراد|👥|users/],
+    ['contract',/تعاقد|عقد|عقود|مناقص|توريد|مشتري|مخزن|مخازن|مورد|📑|📝/],
+    ['money',/ماليه|مالي|ميزانيه|صرف|حوافز|رواتب|اجور|مكافا|ايراد|💰|💵|💳/],
+    ['fix',/صيانه|هندس|اجهزه|معدات|كهرباء|اعطال|مبني|منشا|🔧|🛠|⚙/],
+    ['lab',/معمل|مختبر|تحاليل|اشعه|مناظير|🔬|🧪/],
+    ['pill',/صيدل|دواء|ادويه|علاج|💊/],
+    ['heart',/تمريض|رعايه|مرضي|مريض|عنايه|عمليات|جراح|اطفال|حضانه|باطن|نساء|توليد|عدوي|مكافحه|سلامه|طبي|اكلينيك|❤|🩺|💉|🏥|🧑‍⚕/],
+    ['learn',/تدريب|تعليم|ندوه|محاضر|دورات|تاهيل|🎓|📚/],
+    ['chat',/شكاو|تواصل|رسال|اتصال|دردش|محادث|ملاحظات|اقتراح|💬|📞|✉/],
+    ['data',/تحول رقمي|رقمي|تحليل|داشبورد|لوحه|مؤشر|احصاء|احصائيات|تقارير|تقرير|اداء|بيانات|📊|📈|💻/],
+    ['shield',/حوكمه|جوده|اعتماد|معايير|سياسات|اجراءات|لوائح|امتثال|مخاطر|اداره|🛡|✅/],
+    ['watch',/لجنه|اشراف|متابعه|رقابه|تفتيش|زيارات|مرور|تقييم|فحص|🔍|🔎/]
+  ];
+  function norm(t){return String(t||'').toLowerCase().replace(/[\u064b-\u065f\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')}
+  function hash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)}
+  function pick(h){for(var i=0;i<MAP.length;i++)if(MAP[i][1].test(h))return MAP[i][0];return 'book'}
+  function sparks(n){
+    var P=[[26,30],[172,34],[34,120],[168,118],[100,22],[16,76],[184,78]],o='',a=n%7;
+    for(var i=0;i<3;i++){var p=P[(a+i*2)%7],s=.7+((n>>i)%3)*.25;o+='<g transform="translate('+p[0]+' '+p[1]+') scale('+s+')">'+G+'</g>'}
+    return o;
+  }
+  function art(img,root,capSel,icSel){
+    if(img.getAttribute('data-art'))return;
+    var cap=root.querySelector(capSel),ic=root.querySelector(icSel);
+    var title=cap?cap.textContent:'';if(!title)return;
+    var icon=ic?(ic.textContent+' '+((ic.querySelector('i')||{}).className||'')+' '+(ic.querySelector('img')?ic.querySelector('img').alt||'':'')):'';
+    var key=pick(norm(title)+' '+norm(icon).replace(/fa-/g,' '));
+    img.setAttribute('data-art',key);
+    var n=hash(title);
+    img.insertAdjacentHTML('afterbegin','<svg class="bka" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><circle cx="100" cy="74" r="64" fill="rgba(255,255,255,.12)"/><circle cx="100" cy="74" r="44" fill="rgba(255,255,255,.1)"/>'+sparks(n)+SC[key]+'</svg>');
+    root.classList.add('bk-art');
+  }
+  var busy=false,t=null;
+  function scan(){
+    if(busy)return;busy=true;
+    try{
+      var a=document.querySelectorAll('.bk-cv .bkc-img:not([data-art])');
+      for(var i=0;i<a.length;i++)art(a[i],a[i].closest('.bk-cv'),'.bkc-cap','.bkc-ic');
+      var b=document.querySelectorAll('.bk-tile .bk-t-img:not([data-art]),.bk-cov-img:not([data-art])');
+      for(var j=0;j<b.length;j++){var r=b[j].closest('.bk-tile')||b[j].parentElement;if(r)art(b[j],r,'.bk-cap','.bk-t-ic')}
+    }catch(e){console.warn('bk-cover-art',e)}
+    busy=false;
+  }
+  function later(){clearTimeout(t);t=setTimeout(scan,120)}
+  new MutationObserver(later).observe(document.documentElement,{childList:true,subtree:true});
+  window.__bkArt={scan:scan,scenes:Object.keys(SC),pick:function(s){return pick(norm(s))}};
+  if(document.readyState!=='loading')later();else document.addEventListener('DOMContentLoaded',later);
+  setTimeout(scan,1500);
+})();
+</script>
+
+
+<style id="portal-fix-2026-10">
+/* ======================================================================
+   (1) لوحة تحكم الأدمن ثابتة: بتفضل ظاهرة دايمًا من 700px وطالع، فوق كل المودالات
+       والمودالات بتبدأ بعد عرضها (مش بتغطيها ولا بتعتّمها). تحت 700px (موبايل) بتفضل Drawer.
+   ====================================================================== */
+:root{--sbw:300px}
+@media (min-width:700px) and (max-width:1099px){:root{--sbw:250px}}
+@media (min-width:700px){
+  html body.has-admin-sidebar{padding-left:var(--sbw)!important}
+  html body.has-admin-sidebar #adminSidebar{
+    transform:translateX(0)!important;width:var(--sbw)!important;
+    height:100vh!important;height:100dvh!important;z-index:5000!important;
+  }
+  html body.has-admin-sidebar .sidebar-close,
+  html body.has-admin-sidebar #sidebarToggleBtn,
+  html body.has-admin-sidebar #sidebarOverlay{display:none!important}
+  html body.has-admin-sidebar .modal-overlay,
+  html body.has-admin-sidebar .pgv-overlay{left:var(--sbw)!important;padding-left:0!important;box-sizing:border-box}
+}
+
+/* ======================================================================
+   (2) إدارة المستشفى ورؤساء الأقسام: الأيقونتين (الإدارة العليا + الهيكل التنظيمي) جنب بعض
+       السبب: الشبكة كانت من غير عرض محدد فبتتحول لعمود واحد
+   ====================================================================== */
+html body #hospitalAdminGrid.sub-grid{
+  display:grid!important;width:100%!important;max-width:none!important;margin:0!important;box-sizing:border-box;
+  grid-template-columns:repeat(2,minmax(0,235px))!important;
+  justify-content:center!important;column-gap:34px!important;
+  overflow-y:auto;overflow-x:hidden;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch;
+}
+@media (max-width:640px){
+  html body #hospitalAdminGrid.sub-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;column-gap:12px!important;padding:20px 10px 8px!important}
+  html body #hospitalAdminGrid.sub-grid>.bk-cv{width:100%!important;max-width:185px!important;height:auto!important;aspect-ratio:185/259!important}
+}
+
+/* ======================================================================
+   (3) إدارة المستخدمين والحوكمة: الأربع دفاتر في صف واحد جنب بعض + رول لو الشاشة صغيرة
+       (الدفتر الرابع "الإحصاء الطبي والحوكمة" كان بينزل تحت ومفيش scroll فكان مش بيظهر)
+   ====================================================================== */
+html body #permissionsModal .modal-box{max-width:1120px!important;max-height:90vh}
+html body #permHubGrid.sub-grid{
+  overflow-y:auto;overflow-x:hidden;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  column-gap:clamp(12px,2vw,30px)!important;
+  padding:28px clamp(10px,1.6vw,22px) 12px!important;
+}
+html body #permHubGrid.sub-grid>.bk-cv{
+  width:100%!important;max-width:235px!important;height:auto!important;
+  aspect-ratio:235/329!important;margin:0 auto 34px!important;
+}
+html body #permHubGrid .bkc-cap{font-size:clamp(.85rem,1.45vw,1.3rem)!important;padding:5px 8px!important}
+html body #permHubGrid .bkc-cap.long{font-size:clamp(.78rem,1.2vw,1.08rem)!important}
+@media (max-width:944px){
+  html body #permHubGrid.sub-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+</style>
 </body>
 </html>
