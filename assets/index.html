@@ -1884,6 +1884,7 @@ window.addEventListener('DOMContentLoaded', function(){
     <div class="modal-header" style="flex-shrink:0;">
       <h2 id="hospitalVideoTitle">🎖️ الإدارة العليا</h2>
       <div style="display:flex;align-items:center;gap:8px;">
+        <a id="hospitalVideoOpenLink" class="modal-close" title="فتح الفيديو في تبويب جديد" href="#" target="_blank" rel="noopener" style="text-decoration:none;">↗</a>
         <button class="modal-close" title="تكبير / ملء الشاشة" onclick="toggleHospitalVideoFullscreen()">⛶</button>
         <button class="modal-close" onclick="closeHospitalVideoModal()">✕</button>
       </div>
@@ -1893,9 +1894,8 @@ window.addEventListener('DOMContentLoaded', function(){
         <iframe
           id="hospitalVideoFrame"
           data-src=""
-          loading="lazy"
           style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
-          allow="autoplay"
+          allow="autoplay; fullscreen; encrypted-media"
           allowfullscreen>
         </iframe>
       </div>
@@ -5076,6 +5076,7 @@ function openHospitalVideoModal(item){
   const frame = document.getElementById('hospitalVideoFrame');
   frame.dataset.src = 'https://drive.google.com/file/d/' + item.video + '/preview';
   frame.src = frame.dataset.src;
+  const _ol = document.getElementById('hospitalVideoOpenLink'); if (_ol) _ol.href = 'https://drive.google.com/file/d/' + item.video + '/view';
   document.getElementById('hospitalVideoModal').classList.add('show');
 }
 function toggleHospitalVideoFullscreen(){
@@ -5449,6 +5450,18 @@ html body .bk-cv.bk-act .bkc-open{display:flex!important;flex-direction:column;g
 html body .bk-cv.bk-act .bkc-open>div,html body .bk-cv.bk-act .bkc-open .bk-act-row{display:flex!important;flex-wrap:wrap;gap:3px!important;justify-content:center;margin:0!important;padding:0!important;width:100%}
 html body .bk-cv.bk-act .bkc-open button,html body .bk-cv.bk-act .bkc-open a,html body .bk-cv.bk-act .bkc-open span{flex:1 1 auto;margin:0!important;font-family:'Noto Kufi Arabic','Cairo',sans-serif;font-size:.64rem!important;font-weight:900;line-height:1.5;text-align:center;border:1.5px solid #000;box-sizing:border-box}
 @media (max-width:640px){html body .bk-cv.bk-act{aspect-ratio:3/5.8!important}}
+
+/* ===== FIX (scroll + لوحة الأدمن) ===== */
+/* شبكات الكتب كانت مباشرة جوه .modal-box (overflow:hidden) من غير scroll فكانت بتتقص */
+.modal-box > .sub-grid,#permHubGrid,#hospitalAdminGrid{overflow-y:auto!important;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch;}
+/* تبويبات إدارة المستخدمين/الصلاحيات/السجل/الإحصاء: scroll للتبويب نفسه (طولي وعرضي للجداول) */
+#permTabUsers,#permTabPerm,#permTabLog,#permTabStats{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;}
+#permissionsModal .modal-body{max-height:none;overflow:visible;}
+#permissionsModal .modal-box,#hospitalAdminModal .modal-box{max-height:92vh;}
+.modal-overlay{overscroll-behavior:contain;}
+/* زر ⚙️ بتاع لوحة الأدمن كان تحت المودالات وعارض الصفحات (z-index 500) في الشاشات الصغيرة */
+.btn-sidebar-open{z-index:1500!important;}
+.modal-box{touch-action:pan-y;}
 </style>
 <script id="bk-cover-script">
 (function(){
