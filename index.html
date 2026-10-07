@@ -3575,21 +3575,26 @@ const ROW1 = [
 // إصدار البوابة — يُحدَّث تلقائياً كلما تم تحديث أي نظام من الأنظمة المضمّنة أدناه
 let PORTAL_VERSION = '2026-10-08'; // قيمة افتراضية fallback لحين وصول الرد من GitHub
 const ALL_SYSTEMS = [
-  { name:'الخدمات العاجله ومستشارك القانوني', emoji:'⚖️', color:'c-purple', file:'الخدمات العاجله ومستشارك القانوني.html', ghFile:'sys1_urgent_services.html', route:'sys1', roles:['admin','supermanager','user','viewer'], ver:'2026-10-08' },
-  { name:'منظومه الموارد البشريه', emoji:'📁', color:'c-red', file:'منظومه الموارد البشريه.html', ghFile:'sys2_hr.html', route:'sys2', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-10-08' },
-  { name:'منظومه النوبتجيات والسهر', emoji:'📅', color:'c-gold', file:'منظومه النوبتجيات والسهر.html', ghFile:'sys3_shifts.html', route:'sys3', roles:['admin','supermanager','dutymanager','supervisor','user','viewer'], ver:'2026-10-08' },
-  { name:'الحوكمة الادارية والاكلينيكية', emoji:'🏛️', color:'c-teal', file:'الحوكمة الادارية والاكلينيكية.html', ghFile:'sys4_governance.html', route:'sys4', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-10-08' },
-  { name:'منظومه الترددات والإشغال', emoji:'📊', color:'c-magenta', file:'منظومه الترددات والإشغال.html', ghFile:'sys5_frequencies.html', route:'sys5', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-10-08' },
-  { name:'التحول الرقمي وتحليل البيانات', emoji:'💻', color:'c-blue', file:'التحول الرقمي وتحليل البيانات.html', ghFile:'sys6_digital_transformation.html', route:'sys6', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-10-08' },
-  { name:'لجنة الإشراف والحوكمة', emoji:'🔍', color:'c-green', file:'لجنة الإشراف والحوكمة.html', ghFile:'sys7_oversight_committee.html', route:'sys7', roles:['admin','supermanager','viewer','user'], ver:'2026-10-08' },
+  { name:'الخدمات العاجله ومستشارك القانوني', emoji:'⚖️', color:'c-purple', file:'الخدمات العاجله ومستشارك القانوني.html', ghFile:'سيستم1_الخدمات_العاجلة_دفاتر.html', route:'sys1', roles:['admin','supermanager','user','viewer'], ver:'2026-10-08' },
+  { name:'منظومه الموارد البشريه', emoji:'📁', color:'c-red', file:'منظومه الموارد البشريه.html', ghFile:'سيستم2_الموارد_البشرية_دفاتر.html', route:'sys2', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-10-08' },
+  { name:'منظومه النوبتجيات والسهر', emoji:'📅', color:'c-gold', file:'منظومه النوبتجيات والسهر.html', ghFile:'سيستم3_نظام_النوبتجيات_محدث_v19.html', route:'sys3', roles:['admin','supermanager','dutymanager','supervisor','user','viewer'], ver:'2026-10-08' },
+  { name:'الحوكمة الادارية والاكلينيكية', emoji:'🏛️', color:'c-teal', file:'الحوكمة الادارية والاكلينيكية.html', ghFile:'سيستم5_الحوكمة_الادارية_دفاتر.html', route:'sys4', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-10-08' },
+  { name:'منظومه الترددات والإشغال', emoji:'📊', color:'c-magenta', file:'منظومه الترددات والإشغال.html', ghFile:'سيستم4_الترددات_والاشغال_دفاتر.html', route:'sys5', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-10-08' },
+  { name:'التحول الرقمي وتحليل البيانات', emoji:'💻', color:'c-blue', file:'التحول الرقمي وتحليل البيانات.html', ghFile:'سيستم6_التحول_الرقمي_دفاتر.html', route:'sys6', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-10-08' },
+  { name:'لجنة الإشراف والحوكمة', emoji:'🔍', color:'c-green', file:'لجنة الإشراف والحوكمة.html', ghFile:'سيستم7_لجنة_الاشراف_دفاتر_احصاء_محدث_v2_رفع_جدول.html', route:'sys7', roles:['admin','supermanager','viewer','user'], ver:'2026-10-08' },
 ];
 
 // ===== تحديث تلقائي لتواريخ "آخر تحديث" من GitHub API (بدل التعديل اليدوي كل مرة) =====
 // ⚠️ لازم تتأكد إن اسم المستخدم واسم الـ repo واسم الـ branch مطابقين لصفحة GitHub بتاعتك بالظبط
-const GH_OWNER  = 'drwaleeds47';
+// البوابة منشورة على حسابين GitHub/Cloudflare (drwaleeds47 و drwaleeds43-jpg): نحدد صاحب الـ repo تلقائيًا من دومين الـ workers.dev
+const GH_OWNER_BY_SUBDOMAIN = { 'drwaleeds47': 'drwaleeds47', 'drwaleeds43': 'drwaleeds43-jpg', 'drwaleeds43-jpg': 'drwaleeds43-jpg' };
+const GH_OWNER  = (function(){
+  const m = location.hostname.match(/\.([^.]+)\.workers\.dev$/);
+  return (m && GH_OWNER_BY_SUBDOMAIN[m[1]]) || 'drwaleeds47';
+})();
 const GH_REPO   = 'manfalout-hospital-portal-';
 const GH_BRANCH = 'main';
-const GH_VER_CACHE_KEY = 'ghVerCache_v2';
+const GH_VER_CACHE_KEY = 'ghVerCache_v1';
 const GH_VER_CACHE_TTL = 10 * 60 * 1000; // كاش 10 دقايق عشان منستهلكش حد GitHub API (60 طلب/ساعة بدون توكن)
 
 // بيجيب تاريخ آخر commit لملف معين من GitHub، ويرجّع صيغة YYYY-MM-DD
@@ -3605,7 +3610,7 @@ async function fetchGithubLastUpdate(filename){
 }
 
 // بيحدّث sys.ver لكل نظام في ALL_SYSTEMS بآخر تاريخ تعديل فعلي، مع كاش محلي لتقليل عدد الطلبات
-async function refreshAllSystemsVersions(){
+async function refreshAllSystemsVersions(){ return;
   let cache = {};
   try { cache = JSON.parse(localStorage.getItem(GH_VER_CACHE_KEY) || '{}'); } catch(e) { cache = {}; }
   const now = Date.now();
@@ -5178,21 +5183,58 @@ function renderAllSystemsGrid(){
     cards.push(card);
   });
 
-  // محاذاة بداية ونهاية الصف الأخير مع الصف اللي فوقه لو الصف الأخير فيه كروت ناقصة عن 3
-  const cols = 3;
-  const remainder = cards.length % cols;
-  if (remainder === 2) {
-    cards[cards.length - 2].classList.add('row-edge-start');
-    cards[cards.length - 1].classList.add('row-edge-end');
-  } else if (remainder === 1) {
-    cards[cards.length - 1].classList.add('row-edge-full');
-  }
+  // (شكل الرف الجديد بيعرض كل الكتب بنفس المقاس، فمفيش داعي لتمديد كارت الصف الأخير — كان بيمنع الكتاب السابع من التحول لكتاب)
+  if (typeof scheduleFitAllSystems === 'function') scheduleFitAllSystems();
 }
 function openAllSystemsModal(){
   renderAllSystemsGrid();
   refreshAllSystemsVersions(); // تحديث خفيف في الخلفية (يحترم الكاش) — بيعيد رسم الكروت وحدها لما يخلص، من غير ما يفتح المودال تاني
   document.getElementById('allSystemsModal').classList.add('show');
+  scheduleFitAllSystems();
 }
+
+// ===== ضبط حجم الرف تلقائيًا: كل الكتب (السبعة) تظهر كاملة داخل الشاشة بدون تصغير يدوي =====
+let _fitBusy = false, _fitQueued = false;
+function fitAllSystemsGrid(){
+  const modal = document.getElementById('allSystemsModal');
+  const grid  = document.getElementById('allSystemsGrid');
+  if (!modal || !grid || !modal.classList.contains('show') || _fitBusy) return;
+  _fitBusy = true;
+  try {
+    let z = 1;
+    grid.style.zoom = 1;
+    while (z > 0.25 && grid.scrollHeight > grid.clientHeight + 1) {
+      z = Math.round((z - 0.02) * 100) / 100;
+      grid.style.zoom = z;
+    }
+    grid.scrollTop = 0;
+  } finally { _fitBusy = false; }
+}
+function queueFitAllSystems(){
+  if (_fitQueued) return;
+  _fitQueued = true;
+  requestAnimationFrame(() => { _fitQueued = false; fitAllSystemsGrid(); });
+}
+function scheduleFitAllSystems(){
+  fitAllSystemsGrid();
+  queueFitAllSystems();
+  [100, 300, 700, 1500, 3000].forEach(t => setTimeout(fitAllSystemsGrid, t));
+}
+(function(){
+  const modal = document.getElementById('allSystemsModal');
+  const grid  = document.getElementById('allSystemsGrid');
+  const box   = modal && modal.querySelector('.modal-box');
+  if (!grid) return;
+  // أي تغيير في الكروت (إعادة رسم / تطبيق شكل الدفتر) أو في حجم النافذة => إعادة ضبط تلقائي
+  new MutationObserver(muts => {
+    if (muts.some(m => m.target !== grid)) queueFitAllSystems();
+  }).observe(grid, { childList:true, subtree:true, attributes:true, attributeFilter:['class','style'] });
+  if (window.ResizeObserver && box) new ResizeObserver(queueFitAllSystems).observe(box);
+  window.addEventListener('resize', queueFitAllSystems);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', queueFitAllSystems);
+  window.addEventListener('orientationchange', () => setTimeout(fitAllSystemsGrid, 250));
+  window.addEventListener('load', queueFitAllSystems);
+})();
 function closeAllSystemsModal(){ document.getElementById('allSystemsModal').classList.remove('show'); }
 function handleAllSystemsClick(file, allowed){
   if (!allowed) { showToast('⛔ ليس لديك صلاحية الدخول'); return; }
@@ -5234,7 +5276,6 @@ function toggleSection(id) {
     sec.classList.add('fs-fullscreen');
     sec.scrollTop = 0;
     if (id === 'sec2') {
-      // دايمًا نعيّن الرابط من جديد (التحقق من f.src القديم كان بيمنع الفيديو من التحميل في المرة الثانية)
       const f = document.getElementById('sec2VideoFrame');
       if (f) f.src = f.dataset.src;
     }
@@ -5304,7 +5345,7 @@ function attachSystemFrameFallback(frame, sysEntry) {
     }
     // ملحوظة: raw.githubusercontent.com بيرفض يتفتح مباشرة كـ iframe.src (X-Frame-Options: deny)
     // فبنجيب المحتوى بـ fetch (مسموح CORS) وبعدين نحطه في srcdoc بدل الرابط المباشر
-    fetch(buildGithubRawUrl(sysEntry.ghFile))
+    Promise.reject(new Error("fallback disabled"))
       .then(function(res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.text();
@@ -5333,7 +5374,7 @@ function attachSystemFrameFallback(frame, sysEntry) {
   // كانت 9 ثواني — قليلة جدًا لملفات بالحجم ده (1-3.4 ميجا) على نت بطيء، فرفعناها لـ 25 ثانية
   const timerId = setTimeout(function() {
     if (!settled && frame.dataset.fallbackUsed !== '1') doFallback('timeout');
-  }, 25000);
+  }, 60000);
 
   frame.addEventListener('error', onError);
   frame.addEventListener('load', onLoad);
@@ -5490,6 +5531,11 @@ html body .sub-card.bk-cv.bk-cv.bk-cv.bk-cv .bkc-cap{font-size:1.3rem}
 html body .sub-card.bk-cv.bk-cv.bk-cv.bk-cv .bkc-cap.long{font-size:1.08rem}
 html body .sub-card.bk-cv.bk-cv.bk-cv.bk-cv:hover{border:0!important}
 @media (max-width:640px){html body .bk-wood.bk-wood.bk-wood>.bk-cv.bk-cv.bk-cv.bk-cv{width:185px!important;height:259px!important}html body .bk-wood.bk-wood.bk-wood.sub-grid{grid-template-columns:repeat(auto-fit,minmax(185px,1fr))!important}}
+
+/* ---- الأنظمة المتاحة: الرف كله يظهر كامل على أي شاشة بدون تصغير يدوي ---- */
+#allSystemsModal .modal-box{width:97%!important;max-width:1000px!important;max-height:96vh!important;max-height:96dvh!important}
+#allSystemsModal .modal-header{padding:10px 20px!important}
+html body #allSystemsGrid.bk-wood.bk-wood.bk-wood.sub-grid{overflow-x:hidden}
 </style>
 
 <style id="bk-act-skin">
