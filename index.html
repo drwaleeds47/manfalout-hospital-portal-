@@ -191,8 +191,9 @@ body::before {
   flex:1 1 auto; min-height:0; width:100% !important;
   max-width:none !important; margin:0 !important;
 }
+#sec2.fs-fullscreen .sec2-video-wrap{ display:flex; }
 #sec2.fs-fullscreen .sec2-video-wrap > div{
-  padding-top:0 !important; height:100%; border-radius:10px;
+  padding-top:0 !important; flex:1 1 auto; height:auto; min-height:260px; border-radius:10px;
 }
 @media (min-width:700px){
   /* العارض يبدأ بعد عرض اللوحة الجانبية فلا يكون أي جزء منه تحتها */
@@ -1762,16 +1763,17 @@ window.addEventListener('DOMContentLoaded', function(){
       <!-- Section 2: افتتاح ونشاط المستشفي - 3 فيديوهات تحت بعض -->
       <div id="sec2" style="display:none;margin-top:14px;">
         <button class="fs-exit-btn" onclick="closeFsSection('sec2')">✕ خروج من العرض</button>
-        <h4 style="color:#80cbc4;margin:0 0 14px;font-size:.85rem;">🏗️ افتتاح ونشاط المستشفي</h4>
+        <h4 style="color:#80cbc4;margin:0 0 14px;font-size:.85rem;">🏗️ افتتاح ونشاط المستشفي
+          <a href="https://drive.google.com/file/d/17VJ6LoIEeOOYUy4wzKMn3dAUJHDm7TTI/view" target="_blank" rel="noopener" style="margin-inline-start:14px;color:#ffd54f;font-weight:800;text-decoration:underline;">لو الفيديو لا يعمل: افتحه في نافذة جديدة ↗</a></h4>
 
         <div class="sec2-video-wrap" style="max-width:900px;margin:0 auto;">
           <div style="border-radius:12px;overflow:hidden;background:#000;position:relative;padding-top:56.25%;box-shadow:0 8px 26px rgba(0,0,0,.5);">
             <iframe
               id="sec2VideoFrame"
               data-src="https://drive.google.com/file/d/17VJ6LoIEeOOYUy4wzKMn3dAUJHDm7TTI/preview"
-              loading="lazy"
+              src="about:blank"
               style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
-              allow="autoplay"
+              allow="autoplay; fullscreen; encrypted-media"
               allowfullscreen>
             </iframe>
           </div>
@@ -1922,6 +1924,7 @@ window.addEventListener('DOMContentLoaded', function(){
     <div class="modal-header" style="flex-shrink:0;">
       <h2 id="hospitalVideoTitle">🎖️ الإدارة العليا</h2>
       <div style="display:flex;align-items:center;gap:8px;">
+        <a id="hospitalVideoExtLink" href="#" target="_blank" rel="noopener" title="فتح في نافذة جديدة" style="color:#ffd54f;font-size:.85rem;font-weight:800;text-decoration:underline;white-space:nowrap;">فتح خارجيًا ↗</a>
         <button class="modal-close" title="تكبير / ملء الشاشة" onclick="toggleHospitalVideoFullscreen()">⛶</button>
         <button class="modal-close" onclick="closeHospitalVideoModal()">✕</button>
       </div>
@@ -1931,9 +1934,9 @@ window.addEventListener('DOMContentLoaded', function(){
         <iframe
           id="hospitalVideoFrame"
           data-src=""
-          loading="lazy"
+          src="about:blank"
           style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
-          allow="autoplay"
+          allow="autoplay; fullscreen; encrypted-media"
           allowfullscreen>
         </iframe>
       </div>
@@ -3570,23 +3573,23 @@ const ROW1 = [
 
 // الأنظمة الخمسة الفعلية (بتفتح كل نظام كما هو دون أي تعديل فيه) — تظهر داخل أيقونة "الأنظمة المتاحة"
 // إصدار البوابة — يُحدَّث تلقائياً كلما تم تحديث أي نظام من الأنظمة المضمّنة أدناه
-let PORTAL_VERSION = '2026-08-26'; // قيمة افتراضية fallback لحين وصول الرد من GitHub
+let PORTAL_VERSION = '2026-10-08'; // قيمة افتراضية fallback لحين وصول الرد من GitHub
 const ALL_SYSTEMS = [
-  { name:'الخدمات العاجله ومستشارك القانوني', emoji:'⚖️', color:'c-purple', file:'الخدمات العاجله ومستشارك القانوني.html', ghFile:'sys1_urgent_services.html', route:'sys1', roles:['admin','supermanager','user','viewer'], ver:'2026-08-29' },
-  { name:'منظومه الموارد البشريه', emoji:'📁', color:'c-red', file:'منظومه الموارد البشريه.html', ghFile:'sys2_hr.html', route:'sys2', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-08-29' },
-  { name:'منظومه النوبتجيات والسهر', emoji:'📅', color:'c-gold', file:'منظومه النوبتجيات والسهر.html', ghFile:'sys3_shifts.html', route:'sys3', roles:['admin','supermanager','dutymanager','supervisor','user','viewer'], ver:'2026-09-16' },
-  { name:'الحوكمة الادارية والاكلينيكية', emoji:'🏛️', color:'c-teal', file:'الحوكمة الادارية والاكلينيكية.html', ghFile:'sys4_governance.html', route:'sys4', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-08-29' },
-  { name:'منظومه الترددات والإشغال', emoji:'📊', color:'c-magenta', file:'منظومه الترددات والإشغال.html', ghFile:'sys5_frequencies.html', route:'sys5', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-08-29' },
-  { name:'التحول الرقمي وتحليل البيانات', emoji:'💻', color:'c-blue', file:'التحول الرقمي وتحليل البيانات.html', ghFile:'sys6_digital_transformation.html', route:'sys6', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-09-16' },
-  { name:'لجنة الإشراف والحوكمة', emoji:'🔍', color:'c-green', file:'لجنة الإشراف والحوكمة.html', ghFile:'sys7_oversight_committee.html', route:'sys7', roles:['admin','supermanager','viewer','user'], ver:'2026-09-30' },
+  { name:'الخدمات العاجله ومستشارك القانوني', emoji:'⚖️', color:'c-purple', file:'الخدمات العاجله ومستشارك القانوني.html', ghFile:'sys1_urgent_services.html', route:'sys1', roles:['admin','supermanager','user','viewer'], ver:'2026-10-08' },
+  { name:'منظومه الموارد البشريه', emoji:'📁', color:'c-red', file:'منظومه الموارد البشريه.html', ghFile:'sys2_hr.html', route:'sys2', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-10-08' },
+  { name:'منظومه النوبتجيات والسهر', emoji:'📅', color:'c-gold', file:'منظومه النوبتجيات والسهر.html', ghFile:'sys3_shifts.html', route:'sys3', roles:['admin','supermanager','dutymanager','supervisor','user','viewer'], ver:'2026-10-08' },
+  { name:'الحوكمة الادارية والاكلينيكية', emoji:'🏛️', color:'c-teal', file:'الحوكمة الادارية والاكلينيكية.html', ghFile:'sys4_governance.html', route:'sys4', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-10-08' },
+  { name:'منظومه الترددات والإشغال', emoji:'📊', color:'c-magenta', file:'منظومه الترددات والإشغال.html', ghFile:'sys5_frequencies.html', route:'sys5', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-10-08' },
+  { name:'التحول الرقمي وتحليل البيانات', emoji:'💻', color:'c-blue', file:'التحول الرقمي وتحليل البيانات.html', ghFile:'sys6_digital_transformation.html', route:'sys6', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-10-08' },
+  { name:'لجنة الإشراف والحوكمة', emoji:'🔍', color:'c-green', file:'لجنة الإشراف والحوكمة.html', ghFile:'sys7_oversight_committee.html', route:'sys7', roles:['admin','supermanager','viewer','user'], ver:'2026-10-08' },
 ];
 
 // ===== تحديث تلقائي لتواريخ "آخر تحديث" من GitHub API (بدل التعديل اليدوي كل مرة) =====
 // ⚠️ لازم تتأكد إن اسم المستخدم واسم الـ repo واسم الـ branch مطابقين لصفحة GitHub بتاعتك بالظبط
-const GH_OWNER  = 'drwaleeds43-jpg';
+const GH_OWNER  = 'drwaleeds47';
 const GH_REPO   = 'manfalout-hospital-portal-';
 const GH_BRANCH = 'main';
-const GH_VER_CACHE_KEY = 'ghVerCache_v1';
+const GH_VER_CACHE_KEY = 'ghVerCache_v2';
 const GH_VER_CACHE_TTL = 10 * 60 * 1000; // كاش 10 دقايق عشان منستهلكش حد GitHub API (60 طلب/ساعة بدون توكن)
 
 // بيجيب تاريخ آخر commit لملف معين من GitHub، ويرجّع صيغة YYYY-MM-DD
@@ -5132,6 +5135,8 @@ function openHospitalVideoModal(item){
   const frame = document.getElementById('hospitalVideoFrame');
   frame.dataset.src = 'https://drive.google.com/file/d/' + item.video + '/preview';
   frame.src = frame.dataset.src;
+  const ext = document.getElementById('hospitalVideoExtLink');
+  if (ext) ext.href = 'https://drive.google.com/file/d/' + item.video + '/view';
   document.getElementById('hospitalVideoModal').classList.add('show');
 }
 function toggleHospitalVideoFullscreen(){
@@ -5141,7 +5146,7 @@ function toggleHospitalVideoFullscreen(){
 }
 function closeHospitalVideoModal(){
   const frame = document.getElementById('hospitalVideoFrame');
-  frame.src = '';
+  frame.src = 'about:blank';
   document.getElementById('hospitalVideoModal').classList.remove('show');
 }
 document.getElementById('hospitalVideoModal').addEventListener('click', function(e){
@@ -5203,6 +5208,7 @@ function openInfoModal() {
   document.getElementById('infoModal').classList.add('show');
 }
 function closeInfoModal() {
+  ['sec1','sec2'].forEach(function(s){ try{ closeFsSection(s); }catch(e){} });
   document.getElementById('infoModal').classList.remove('show');
   document.querySelectorAll('#infoModal video').forEach(v => v.pause());
   if(window.qwMusic){ window.qwMusic.pause(); window.qwMusic.currentTime=0; }
@@ -5220,7 +5226,7 @@ function toggleSection(id) {
     if(s === 'sec1' && window.qwMusic){ window.qwMusic.pause(); window.qwMusic.currentTime=0; }
     if(s === 'sec2'){
       const f = document.getElementById('sec2VideoFrame');
-      if (f && f.src) f.src = '';
+      if (f) f.src = 'about:blank';
     }
   });
   if (isHidden) {
@@ -5228,8 +5234,9 @@ function toggleSection(id) {
     sec.classList.add('fs-fullscreen');
     sec.scrollTop = 0;
     if (id === 'sec2') {
+      // دايمًا نعيّن الرابط من جديد (التحقق من f.src القديم كان بيمنع الفيديو من التحميل في المرة الثانية)
       const f = document.getElementById('sec2VideoFrame');
-      if (f && !f.src) f.src = f.dataset.src;
+      if (f) f.src = f.dataset.src;
     }
     if (id === 'sec1') {
       if (!qwInitialized) {
@@ -5247,7 +5254,7 @@ function closeFsSection(id) {
   sec.classList.remove('fs-fullscreen');
   document.querySelectorAll('#'+id+' video, #'+id+' iframe').forEach(el => {
     if (el.tagName === 'VIDEO') el.pause();
-    if (el.tagName === 'IFRAME' && el.id === 'sec2VideoFrame') el.src = '';
+    if (el.tagName === 'IFRAME' && el.id === 'sec2VideoFrame') el.src = 'about:blank';
   });
   if (id === 'sec1' && window.qwMusic) { window.qwMusic.pause(); window.qwMusic.currentTime = 0; }
 }

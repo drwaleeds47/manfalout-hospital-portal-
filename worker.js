@@ -14,6 +14,17 @@ function effectiveRole(type) {
   return type === 'متعاقد' ? 'user' : type;
 }
 
+// ملفات الأنظمة → مسار /open/sysN (عشان أي دخول مباشر على اسم الملف يتحول للبوابة المحمية)
+const FILE_TO_ROUTE = Object.fromEntries(
+  Object.entries(SYSTEM_ROUTES).map(([route, r]) => [r.file, route])
+);
+
+// يمنع Open Redirect: next لازم يكون مسار داخلي بيبدأ بـ / وليس // أو \\
+function safeNext(next) {
+  if (typeof next !== 'string' || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return '/';
+  return next;
+}
+
 const COOKIE_NAME = 'gw_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 ساعات
 
@@ -112,7 +123,7 @@ export default {
 
     // ----- معالجة تسجيل الدخول -----
     if (url.pathname === '/gw-login' && request.method === 'POST') {
-      const nextPath = url.searchParams.get('next') || '/';
+      const nextPath = safeNext(url.searchParams.get('next') || '/');
       const form = await request.formData();
       const name = (form.get('name') || '').toString().trim();
       const password = (form.get('password') || '').toString();
@@ -144,6 +155,14 @@ export default {
       const headers = new Headers({ 'Location': '/' });
       headers.append('Set-Cookie', `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`);
       return new Response(null, { status: 302, headers });
+    }
+
+    // ----- منع فتح ملفات الأنظمة مباشرة بدون جلسة: /sys1_urgent_services.html → /open/sys1 -----
+    // (ملحوظة: عشان الـ Worker يشوف الطلب ده لازم assets.run_worker_first = true في wrangler.toml)
+    let directFile = '';
+    try { directFile = decodeURIComponent(url.pathname.replace(/^\//, '')); } catch (e) { directFile = ''; }
+    if (FILE_TO_ROUTE[directFile]) {
+      return new Response(null, { status: 302, headers: { 'Location': '/open/' + FILE_TO_ROUTE[directFile] } });
     }
 
     // ----- روابط الأنظمة المباشرة: /open/sys1 .. /open/sys7 (محمية بتسجيل دخول) -----
