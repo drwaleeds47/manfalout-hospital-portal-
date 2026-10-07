@@ -191,9 +191,8 @@ body::before {
   flex:1 1 auto; min-height:0; width:100% !important;
   max-width:none !important; margin:0 !important;
 }
-#sec2.fs-fullscreen .sec2-video-wrap{ display:flex; }
 #sec2.fs-fullscreen .sec2-video-wrap > div{
-  padding-top:0 !important; flex:1 1 auto; height:auto; min-height:260px; border-radius:10px;
+  padding-top:0 !important; height:100%; border-radius:10px;
 }
 @media (min-width:700px){
   /* العارض يبدأ بعد عرض اللوحة الجانبية فلا يكون أي جزء منه تحتها */
@@ -735,6 +734,15 @@ body::before {
   .pgv-title-text .pgv-name { font-size:.92rem;max-width:44vw; }
   .pgv-title-emoji { width:38px;height:38px;font-size:1.25rem; }
 }
+</style>
+<style id="svStyles">
+.sv-host{position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;}
+.sv-host video,.sv-host iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;object-fit:contain;}
+.sv-load{position:absolute;z-index:2;color:#e8eaf6;font-size:.9rem;pointer-events:none;}
+.sv-msg{color:#e8eaf6;text-align:center;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;max-width:420px;line-height:1.7;font-size:.95rem;}
+.sv-ic{font-size:2.4rem}.sv-sub{font-size:.8rem;opacity:.8}
+.sv-btn{display:inline-block;margin-top:4px;padding:9px 18px;border-radius:10px;background:#f5c542;color:#1a1a2e;font-weight:700;text-decoration:none;font-size:.85rem}
+.sv-float{position:absolute;top:8px;left:8px;z-index:3;margin:0;padding:6px 12px;font-size:.72rem;opacity:.9}
 </style>
 </head>
 <body>
@@ -1763,19 +1771,11 @@ window.addEventListener('DOMContentLoaded', function(){
       <!-- Section 2: افتتاح ونشاط المستشفي - 3 فيديوهات تحت بعض -->
       <div id="sec2" style="display:none;margin-top:14px;">
         <button class="fs-exit-btn" onclick="closeFsSection('sec2')">✕ خروج من العرض</button>
-        <h4 style="color:#80cbc4;margin:0 0 14px;font-size:.85rem;">🏗️ افتتاح ونشاط المستشفي
-          <a href="https://drive.google.com/file/d/17VJ6LoIEeOOYUy4wzKMn3dAUJHDm7TTI/view" target="_blank" rel="noopener" style="margin-inline-start:14px;color:#ffd54f;font-weight:800;text-decoration:underline;">لو الفيديو لا يعمل: افتحه في نافذة جديدة ↗</a></h4>
+        <h4 style="color:#80cbc4;margin:0 0 14px;font-size:.85rem;">🏗️ افتتاح ونشاط المستشفي</h4>
 
         <div class="sec2-video-wrap" style="max-width:900px;margin:0 auto;">
           <div style="border-radius:12px;overflow:hidden;background:#000;position:relative;padding-top:56.25%;box-shadow:0 8px 26px rgba(0,0,0,.5);">
-            <iframe
-              id="sec2VideoFrame"
-              data-src="https://drive.google.com/file/d/17VJ6LoIEeOOYUy4wzKMn3dAUJHDm7TTI/preview"
-              src="about:blank"
-              style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
-              allow="autoplay; fullscreen; encrypted-media"
-              allowfullscreen>
-            </iframe>
+            <div id="sec2VideoHost" class="sv-host"></div>
           </div>
         </div>
       </div>
@@ -1924,21 +1924,13 @@ window.addEventListener('DOMContentLoaded', function(){
     <div class="modal-header" style="flex-shrink:0;">
       <h2 id="hospitalVideoTitle">🎖️ الإدارة العليا</h2>
       <div style="display:flex;align-items:center;gap:8px;">
-        <a id="hospitalVideoExtLink" href="#" target="_blank" rel="noopener" title="فتح في نافذة جديدة" style="color:#ffd54f;font-size:.85rem;font-weight:800;text-decoration:underline;white-space:nowrap;">فتح خارجيًا ↗</a>
         <button class="modal-close" title="تكبير / ملء الشاشة" onclick="toggleHospitalVideoFullscreen()">⛶</button>
         <button class="modal-close" onclick="closeHospitalVideoModal()">✕</button>
       </div>
     </div>
     <div style="padding:20px;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;">
       <div id="hospitalVideoWrap" style="border-radius:12px;overflow:hidden;background:#000;position:relative;height:100%;max-height:100%;aspect-ratio:9/16;width:auto;max-width:100%;margin:0 auto;box-shadow:0 8px 26px rgba(0,0,0,.5);">
-        <iframe
-          id="hospitalVideoFrame"
-          data-src=""
-          src="about:blank"
-          style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
-          allow="autoplay; fullscreen; encrypted-media"
-          allowfullscreen>
-        </iframe>
+        <div id="hospitalVideoHost" class="sv-host"></div>
       </div>
     </div>
   </div>
@@ -3464,10 +3456,33 @@ listenPortalAdminLog();
 // ===== نظام الصلاحيات الفعلية لكل مستخدم على حدة =====
 // المفتاح: اسم المستخدم -> { 'اسم_ملف_السيستم.html': true/false }
 // لو مفيش قيمة محفوظة لسيستم معين لمستخدم معين => يتبع صلاحية الدور الافتراضية (roles)
+// ترحيل مفاتيح الصلاحيات القديمة (أسماء الملفات العربية) إلى الأسماء الجديدة sysN_*.html
+const LEGACY_FILE_MAP = {
+  'الخدمات العاجله ومستشارك القانوني.html':'sys1_urgent_services.html',
+  'منظومه الموارد البشريه.html':'sys2_hr.html',
+  'منظومه النوبتجيات والسهر.html':'sys3_shifts.html',
+  'الحوكمة الادارية والاكلينيكية.html':'sys4_governance.html',
+  'منظومه الترددات والإشغال.html':'sys5_frequencies.html',
+  'التحول الرقمي وتحليل البيانات.html':'sys6_digital_transformation.html',
+  'لجنة الإشراف والحوكمة.html':'sys7_oversight_committee.html'
+};
+function migratePermKeys(obj){
+  Object.keys(obj||{}).forEach(function(u){
+    var o=obj[u]; if(!o||typeof o!=='object') return;
+    Object.keys(LEGACY_FILE_MAP).forEach(function(a){
+      if(Object.prototype.hasOwnProperty.call(o,a)){
+        var n=LEGACY_FILE_MAP[a];
+        if(!Object.prototype.hasOwnProperty.call(o,n)) o[n]=o[a];
+        delete o[a];
+      }
+    });
+  });
+}
 let USER_PERMISSIONS = (function(){
   try { var saved = localStorage.getItem('portal_user_permissions_v1'); if (saved) return JSON.parse(saved); } catch(e){}
   return {};
 })();
+migratePermKeys(USER_PERMISSIONS);
 function persistPermissions(){
   try { localStorage.setItem('portal_user_permissions_v1', JSON.stringify(USER_PERMISSIONS)); } catch(e){}
   portalDb.ref('portal_permissions_json').set(JSON.stringify(USER_PERMISSIONS));
@@ -3480,6 +3495,7 @@ function listenPortalPermissions(){
         const cloud = JSON.parse(raw);
         Object.keys(USER_PERMISSIONS).forEach(k => delete USER_PERMISSIONS[k]);
         Object.keys(cloud).forEach(k => { USER_PERMISSIONS[k] = cloud[k]; });
+        migratePermKeys(USER_PERMISSIONS);
         try { localStorage.setItem('portal_user_permissions_v1', JSON.stringify(USER_PERMISSIONS)); } catch(e){}
       } catch(e) { console.warn('تعذرت قراءة صلاحيات البوابة من السحابة:', e.message); }
     } else if (Object.keys(USER_PERMISSIONS).length) {
@@ -3573,25 +3589,20 @@ const ROW1 = [
 
 // الأنظمة الخمسة الفعلية (بتفتح كل نظام كما هو دون أي تعديل فيه) — تظهر داخل أيقونة "الأنظمة المتاحة"
 // إصدار البوابة — يُحدَّث تلقائياً كلما تم تحديث أي نظام من الأنظمة المضمّنة أدناه
-let PORTAL_VERSION = '2026-10-08'; // قيمة افتراضية fallback لحين وصول الرد من GitHub
+let PORTAL_VERSION = '2026-08-26'; // قيمة افتراضية fallback لحين وصول الرد من GitHub
 const ALL_SYSTEMS = [
-  { name:'الخدمات العاجله ومستشارك القانوني', emoji:'⚖️', color:'c-purple', file:'الخدمات العاجله ومستشارك القانوني.html', ghFile:'sys1_urgent_services.html', route:'sys1', roles:['admin','supermanager','user','viewer'], ver:'2026-10-08' },
-  { name:'منظومه الموارد البشريه', emoji:'📁', color:'c-red', file:'منظومه الموارد البشريه.html', ghFile:'sys2_hr.html', route:'sys2', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-10-08' },
-  { name:'منظومه النوبتجيات والسهر', emoji:'📅', color:'c-gold', file:'منظومه النوبتجيات والسهر.html', ghFile:'sys3_shifts.html', route:'sys3', roles:['admin','supermanager','dutymanager','supervisor','user','viewer'], ver:'2026-10-08' },
-  { name:'الحوكمة الادارية والاكلينيكية', emoji:'🏛️', color:'c-teal', file:'الحوكمة الادارية والاكلينيكية.html', ghFile:'sys4_governance.html', route:'sys4', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-10-08' },
-  { name:'منظومه الترددات والإشغال', emoji:'📊', color:'c-magenta', file:'منظومه الترددات والإشغال.html', ghFile:'sys5_frequencies.html', route:'sys5', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-10-08' },
-  { name:'التحول الرقمي وتحليل البيانات', emoji:'💻', color:'c-blue', file:'التحول الرقمي وتحليل البيانات.html', ghFile:'sys6_digital_transformation.html', route:'sys6', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-10-08' },
-  { name:'لجنة الإشراف والحوكمة', emoji:'🔍', color:'c-green', file:'لجنة الإشراف والحوكمة.html', ghFile:'sys7_oversight_committee.html', route:'sys7', roles:['admin','supermanager','viewer','user'], ver:'2026-10-08' },
+  { name:'الخدمات العاجله ومستشارك القانوني', emoji:'⚖️', color:'c-purple', file:'sys1_urgent_services.html', oldFile:'الخدمات العاجله ومستشارك القانوني.html', ghFile:'sys1_urgent_services.html', route:'sys1', roles:['admin','supermanager','user','viewer'], ver:'2026-08-29' },
+  { name:'منظومه الموارد البشريه', emoji:'📁', color:'c-red', file:'sys2_hr.html', oldFile:'منظومه الموارد البشريه.html', ghFile:'sys2_hr.html', route:'sys2', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-08-29' },
+  { name:'منظومه النوبتجيات والسهر', emoji:'📅', color:'c-gold', file:'sys3_shifts.html', oldFile:'منظومه النوبتجيات والسهر.html', ghFile:'sys3_shifts.html', route:'sys3', roles:['admin','supermanager','dutymanager','supervisor','user','viewer'], ver:'2026-09-16' },
+  { name:'الحوكمة الادارية والاكلينيكية', emoji:'🏛️', color:'c-teal', file:'sys4_governance.html', oldFile:'الحوكمة الادارية والاكلينيكية.html', ghFile:'sys4_governance.html', route:'sys4', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-08-29' },
+  { name:'منظومه الترددات والإشغال', emoji:'📊', color:'c-magenta', file:'sys5_frequencies.html', oldFile:'منظومه الترددات والإشغال.html', ghFile:'sys5_frequencies.html', route:'sys5', roles:['admin','supermanager','dutymanager','user','viewer'], ver:'2026-08-29' },
+  { name:'التحول الرقمي وتحليل البيانات', emoji:'💻', color:'c-blue', file:'sys6_digital_transformation.html', oldFile:'التحول الرقمي وتحليل البيانات.html', ghFile:'sys6_digital_transformation.html', route:'sys6', roles:['admin','supermanager','dutymanager','supervisor','viewer','user'], ver:'2026-09-16' },
+  { name:'لجنة الإشراف والحوكمة', emoji:'🔍', color:'c-green', file:'sys7_oversight_committee.html', oldFile:'لجنة الإشراف والحوكمة.html', ghFile:'sys7_oversight_committee.html', route:'sys7', roles:['admin','supermanager','viewer','user'], ver:'2026-09-30' },
 ];
 
 // ===== تحديث تلقائي لتواريخ "آخر تحديث" من GitHub API (بدل التعديل اليدوي كل مرة) =====
 // ⚠️ لازم تتأكد إن اسم المستخدم واسم الـ repo واسم الـ branch مطابقين لصفحة GitHub بتاعتك بالظبط
-// البوابة منشورة على حسابين GitHub/Cloudflare (drwaleeds47 و drwaleeds43-jpg): نحدد صاحب الـ repo تلقائيًا من دومين الـ workers.dev
-const GH_OWNER_BY_SUBDOMAIN = { 'drwaleeds47': 'drwaleeds47', 'drwaleeds43': 'drwaleeds43-jpg', 'drwaleeds43-jpg': 'drwaleeds43-jpg' };
-const GH_OWNER  = (function(){
-  const m = location.hostname.match(/\.([^.]+)\.workers\.dev$/);
-  return (m && GH_OWNER_BY_SUBDOMAIN[m[1]]) || 'drwaleeds47';
-})();
+const GH_OWNER  = 'drwaleeds43-jpg';
 const GH_REPO   = 'manfalout-hospital-portal-';
 const GH_BRANCH = 'main';
 const GH_VER_CACHE_KEY = 'ghVerCache_v1';
@@ -3650,8 +3661,80 @@ async function refreshAllSystemsVersions(){ return;
 window.addEventListener('DOMContentLoaded', () => { refreshAllSystemsVersions(); });
 
 // ===== "إدارة المستشفى ورؤساء الأقسام" — أيقونات مستقلة، كل أيقونة تفتح عارض عروض (Gallery) فاخر =====
+// ===== مشغّل الفيديو الذكي (يعمل محليًا وبعد الرفع): videos/<key>.mp4 ← GitHub ← Drive مباشر ← Drive iframe ← زر الفتح =====
+function svSources(key, driveId){
+  const list = [{t:'v', u:'videos/' + key + '.mp4'}];
+  const web = location.protocol !== 'file:';
+  if (web && typeof GH_OWNER !== 'undefined') list.push({t:'v', u:`https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/videos/${key}.mp4`});
+  if (driveId) {
+    list.push({t:'v', slow:true, u:`https://drive.usercontent.google.com/download?id=${driveId}&export=download&confirm=t`});
+    if (web) list.push({t:'f', u:`https://drive.google.com/file/d/${driveId}/preview`});
+  }
+  return list;
+}
+function svStop(host){
+  if (!host) return;
+  host.dataset.svToken = '';
+  const v = host.querySelector('video');
+  if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch(e){} }
+  host.innerHTML = '';
+}
+function svPlay(host, key, driveId){
+  if (!host) return;
+  svStop(host);
+  const token = Date.now() + ':' + Math.random();
+  host.dataset.svToken = token;
+  const srcs = svSources(key, driveId);
+  const driveView = driveId ? `https://drive.google.com/file/d/${driveId}/view` : '';
+  let i = -1, timer = null, cur = null;
+  const alive = () => host.dataset.svToken === token;
+  const link = (cls) => driveView ? `<a class="sv-btn ${cls}" href="${driveView}" target="_blank" rel="noopener">فتح الفيديو في Google Drive ↗</a>` : '';
+  function abandon(){
+    clearTimeout(timer);
+    const old = cur; cur = null;
+    if (old) { try { old.pause(); old.removeAttribute('src'); old.load(); } catch(e){} }
+  }
+  function fail(){
+    host.innerHTML = `<div class="sv-msg"><div class="sv-ic">🎬</div><div>تعذّر تشغيل الفيديو داخل الصفحة</div><div class="sv-sub">ضع الملف باسم <b dir="ltr">videos/${key}.mp4</b> بجوار index.html</div>${link('')}</div>`;
+  }
+  function next(){
+    if (!alive()) return;
+    abandon();
+    i++;
+    if (i >= srcs.length) return fail();
+    const s = srcs[i];
+    if (s.t === 'f') {
+      host.innerHTML = '';
+      const f = document.createElement('iframe');
+      f.setAttribute('allow', 'autoplay; fullscreen');
+      f.setAttribute('allowfullscreen', '');
+      f.src = s.u;
+      host.appendChild(f);
+      host.insertAdjacentHTML('beforeend', link('sv-float'));
+      return;
+    }
+    host.innerHTML = '<div class="sv-load">⏳ جارٍ تحميل الفيديو…</div>';
+    const v = document.createElement('video');
+    v.controls = true; v.playsInline = true; v.preload = 'auto';
+    let ok = false;
+    cur = v;
+    v.addEventListener('loadedmetadata', () => {
+      if (cur !== v || !alive()) return;
+      ok = true; clearTimeout(timer);
+      const ld = host.querySelector('.sv-load'); if (ld) ld.remove();
+      v.play().catch(() => {});
+    });
+    v.addEventListener('error', () => { if (cur === v && !ok) next(); });
+    timer = setTimeout(() => { if (cur === v && !ok) next(); }, s.slow ? 20000 : 12000);
+    host.appendChild(v);
+    v.src = s.u;
+  }
+  next();
+}
+window.svPlay = svPlay; window.svStop = svStop;
+
 const HOSPITAL_ADMIN_ITEMS = [
-  { id:'topmgmt',   name:'الإدارة العليا',        emoji:'🎖️', color:'c-blue',  video:'13IFBROAAp_n0GQiPGoGZsNgynO5pNgkj' },
+  { id:'topmgmt',   name:'الإدارة العليا',        emoji:'🎖️', color:'c-blue',  video:'1QLyidc3vTeX1QOxrePRKBWbZDGk3u1kA' },
   { id:'orgchart',  name:'الهيكل التنظيمي واللجان', emoji:'🗂️', color:'c-green', video:'1cBnIdLK0cs8UPVzi2pK-8mSPtJGw4-_d' },
 ];
 
@@ -5137,12 +5220,8 @@ function handleHospitalAdminClick(id){
 }
 function openHospitalVideoModal(item){
   document.getElementById('hospitalVideoTitle').textContent = (item.emoji || '🎬') + ' ' + item.name;
-  const frame = document.getElementById('hospitalVideoFrame');
-  frame.dataset.src = 'https://drive.google.com/file/d/' + item.video + '/preview';
-  frame.src = frame.dataset.src;
-  const ext = document.getElementById('hospitalVideoExtLink');
-  if (ext) ext.href = 'https://drive.google.com/file/d/' + item.video + '/view';
   document.getElementById('hospitalVideoModal').classList.add('show');
+  svPlay(document.getElementById('hospitalVideoHost'), item.id, item.video);
 }
 function toggleHospitalVideoFullscreen(){
   const el = document.getElementById('hospitalVideoWrap');
@@ -5150,8 +5229,7 @@ function toggleHospitalVideoFullscreen(){
   else { document.exitFullscreen && document.exitFullscreen().catch(()=>{}); }
 }
 function closeHospitalVideoModal(){
-  const frame = document.getElementById('hospitalVideoFrame');
-  frame.src = 'about:blank';
+  svStop(document.getElementById('hospitalVideoHost'));
   document.getElementById('hospitalVideoModal').classList.remove('show');
 }
 document.getElementById('hospitalVideoModal').addEventListener('click', function(e){
@@ -5250,9 +5328,9 @@ function openInfoModal() {
   document.getElementById('infoModal').classList.add('show');
 }
 function closeInfoModal() {
-  ['sec1','sec2'].forEach(function(s){ try{ closeFsSection(s); }catch(e){} });
   document.getElementById('infoModal').classList.remove('show');
   document.querySelectorAll('#infoModal video').forEach(v => v.pause());
+  svStop(document.getElementById('sec2VideoHost'));
   if(window.qwMusic){ window.qwMusic.pause(); window.qwMusic.currentTime=0; }
 }
 let qwInitialized = false;
@@ -5267,8 +5345,7 @@ function toggleSection(id) {
     document.querySelectorAll('#'+s+' video').forEach(v => v.pause());
     if(s === 'sec1' && window.qwMusic){ window.qwMusic.pause(); window.qwMusic.currentTime=0; }
     if(s === 'sec2'){
-      const f = document.getElementById('sec2VideoFrame');
-      if (f) f.src = 'about:blank';
+      svStop(document.getElementById('sec2VideoHost'));
     }
   });
   if (isHidden) {
@@ -5276,8 +5353,7 @@ function toggleSection(id) {
     sec.classList.add('fs-fullscreen');
     sec.scrollTop = 0;
     if (id === 'sec2') {
-      const f = document.getElementById('sec2VideoFrame');
-      if (f) f.src = f.dataset.src;
+      svPlay(document.getElementById('sec2VideoHost'), 'opening', '1NxNo1FHI2RJcp4IvIuvNlCxzELUVFLOr');
     }
     if (id === 'sec1') {
       if (!qwInitialized) {
@@ -5295,8 +5371,8 @@ function closeFsSection(id) {
   sec.classList.remove('fs-fullscreen');
   document.querySelectorAll('#'+id+' video, #'+id+' iframe').forEach(el => {
     if (el.tagName === 'VIDEO') el.pause();
-    if (el.tagName === 'IFRAME' && el.id === 'sec2VideoFrame') el.src = 'about:blank';
-  });
+    });
+  if (id === 'sec2') svStop(document.getElementById('sec2VideoHost'));
   if (id === 'sec1' && window.qwMusic) { window.qwMusic.pause(); window.qwMusic.currentTime = 0; }
 }
 document.getElementById('infoModal').addEventListener('click', function(e) {
@@ -5433,7 +5509,7 @@ async function openSystem(filename) {
     };
 
     const title = document.createElement('span');
-    title.textContent = '🏥  ' + filename.replace('.html','');
+    title.textContent = '🏥  ' + (sysEntry.name || filename.replace('.html',''));
     title.style.cssText = 'color:#e6b800;font-weight:900;font-size:1rem;direction:rtl;font-family:Tajawal,Cairo,sans-serif';
 
     bar.appendChild(closeBtn);
