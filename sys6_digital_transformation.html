@@ -4316,8 +4316,30 @@ function perfDetectGovSheet1(wb){
         return { sheetName, rows };
       }
     }
+    /* لو عنوان «نموذج نشاط المستشفيات» مش موجود (زي ملف سبتمبر 2026)، نتعرف على النموذج من شكله:
+       صف عنوان «المستشفى» + 4 صفوف بيانات باسم المستشفى + عنوان «الأشعة العادية» */
+    if(perfLooksLikeGovSheet1(rows)) return { sheetName, rows };
   }
   return null;
+}
+function perfIsHospitalDataRow(row){
+  if(!row || !row.length) return false;
+  const c0 = row[0];
+  if(typeof c0 !== 'string') return false;
+  const s = c0.trim();
+  if(!s || s === 'المستشفى') return false;
+  if(s.includes('مستشفى')) return true;
+  return row.filter(v => typeof v === 'number').length >= 8;
+}
+function perfLooksLikeGovSheet1(rows){
+  let hasHeader = false, hasRad = false, dataRows = 0;
+  for(const row of rows){
+    if(!row || !row.length) continue;
+    if(typeof row[0] === 'string' && row[0].trim() === 'المستشفى') hasHeader = true;
+    if(row.some(c => typeof c === 'string' && c.includes('الأشعة العادية'))) hasRad = true;
+    if(perfIsHospitalDataRow(row)) dataRows++;
+  }
+  return hasHeader && hasRad && dataRows >= 4;
 }
 
 /* بيقرا الشهر والسنة من عنوان التقرير نفسه (بيتكتب فيه "شهر يونيه 2026" مثلًا)،
@@ -4359,8 +4381,7 @@ function perfParseGovSheet1(rows){
   const hospitalRows = [];
   for(const row of rows){
     if(!row || !row.length) continue;
-    const c0 = row[0];
-    if(typeof c0 === 'string' && c0.trim() !== 'المستشفى' && c0.includes('مستشفى')){
+    if(perfIsHospitalDataRow(row)){
       hospitalRows.push(row);
     }
   }
