@@ -7,6 +7,7 @@ const SYSTEM_ROUTES = {
   'sys5': { file: 'sys5_frequencies.html', roles: ['admin', 'supermanager', 'dutymanager', 'user', 'viewer'] },
   'sys6': { file: 'sys6_digital_transformation.html', roles: ['admin', 'supermanager', 'dutymanager', 'supervisor', 'viewer', 'user'] },
   'sys7': { file: 'sys7_oversight_committee.html', roles: ['admin', 'supermanager', 'viewer', 'user'] },
+  'sys8': { file: 'sys8.html', roles: ['admin', 'supermanager', 'viewer', 'user'] },
 };
 
 // المتعاقدين يرثون افتراضيًا نفس صلاحيات الموظف العادي (user) — نفس القاعدة المطبقة في البوابة
@@ -165,8 +166,8 @@ export default {
       return new Response(null, { status: 302, headers: { 'Location': '/open/' + FILE_TO_ROUTE[directFile] } });
     }
 
-    // ----- روابط الأنظمة المباشرة: /open/sys1 .. /open/sys7 (محمية بتسجيل دخول) -----
-    const m = url.pathname.match(/^\/open\/(sys[1-7])\/?$/);
+    // ----- روابط الأنظمة المباشرة: /open/sys1 .. /open/sys8 (محمية بتسجيل دخول) -----
+    const m = url.pathname.match(/^\/open\/(sys[1-8])\/?$/);
     if (m) {
       const cookieToken = getCookie(request, COOKIE_NAME);
       const session = await verifySession(cookieToken, env.AUTH_SECRET);
