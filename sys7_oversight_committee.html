@@ -4419,7 +4419,30 @@ const blank=()=>({users:[],reports:[],legacy:[],invs:[],pens:[],grvs:[],svcReqs:
 function migrate(o){o=Object.assign(blank(),o);const old=(o.reports||[]).filter(r=>!r.templateId);if(old.length){o.legacy=(o.legacy||[]).concat(old);o.reports=o.reports.filter(r=>r.templateId)}if(!o.staffData)o.staffData=clone(DOCTORS_DATA_SEED);if(!o.staffData['الإدارة الإشرافية'])o.staffData['الإدارة الإشرافية']=[];return o}
 function load(){try{const s=localStorage.getItem(LS);if(s)return migrate(JSON.parse(s))}catch(e){}return mem||blank()}
 let DB=load();
-function save(){mem=DB;try{localStorage.setItem(LS,JSON.stringify(DB))}catch(e){toast('تعذّر الحفظ داخل المتصفح. صدّر نسخة احتياطية من إدارة المستخدمين.','err')}}
+/* ===== تخزين محلي مخفّف: Firebase هو المصدر الأساسي، وlocalStorage نسخة صغيرة فقط لو المساحة امتلأت ===== */
+const LITE_LS='sys7_lite',KEEP_LOCAL=['users','seq','seedV','hiddenRemote'];
+function liteGet(){try{return JSON.parse(localStorage.getItem(LITE_LS)||'[]')}catch(_){return[]}}
+window._notLoaded=new Set(liteGet()); /* مفاتيح مش موجودة في النسخة المحلية → ماتترفعش للسحابة قبل ما تتحمّل منها */
+let _liteWarned=false;
+function fbReady(){try{return !!fbDb}catch(_){return false}}
+function lsLite(){
+  if(!fbReady())return false;
+  const sizes=Object.keys(DB).filter(k=>!KEEP_LOCAL.includes(k)).map(k=>{let n=0;try{n=JSON.stringify(DB[k]).length}catch(_){}return[k,n]}).sort((a,b)=>b[1]-a[1]);
+  const lite=Object.assign({},DB),dropped=[];
+  for(const [k] of sizes){
+    delete lite[k];dropped.push(k);
+    try{localStorage.setItem(LITE_LS,JSON.stringify(dropped));localStorage.setItem(LS,JSON.stringify(lite));
+      if(!_liteWarned){_liteWarned=true;toast('☁️ مساحة المتصفح ممتلئة — البيانات الكبيرة بتتحفظ في Firebase، والمتصفح فيه نسخة مخفّفة فقط')}
+      return true}catch(_){}
+  }
+  return false;
+}
+function lsPersist(){
+  try{localStorage.setItem(LS,JSON.stringify(DB));try{localStorage.removeItem(LITE_LS)}catch(_){}return true}
+  catch(e){return lsLite()}
+}
+window.lsReport=function(){const r=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);r.push({key:k,KB:Math.round((localStorage.getItem(k)||'').length*2/1024)})}r.sort((a,b)=>b.KB-a.KB);console.table(r);return r};
+function save(){mem=DB;if(!lsPersist())toast('تعذّر الحفظ داخل المتصفح. صدّر نسخة احتياطية من إدارة المستخدمين.','err')}
 const nextNo=k=>{DB.seq[k]=(DB.seq[k]||0)+1;return DB.seq[k]+'/'+new Date().getFullYear()};
 const allUsers=()=>[ADMIN,...DB.users];
 const byId=(a,id)=>DB[a].find(x=>x.id===id);
@@ -4666,8 +4689,8 @@ const S={user:null,view:'home',p:{},tab:{},draft:null};
 window.S=S; /* إصلاح: كود الموارد البشرية (سكريبت منفصل) يحتاج يشوف المستخدم الحالي */
 const app=$('#app');
 try{const id=sessionStorage.getItem(SS);if(id)S.user=allUsers().find(u=>u.id===id)||null}catch(e){}
-/* فتح جميع الأيقونات للجميع ما عدا «إدارة المستخدمين والحوكمة» (تبقى للأدمن فقط). للرجوع للصلاحيات الفردية: اجعلها false */
-const OPEN_ALL_ICONS=true;
+/* الصلاحيات الفردية مفعّلة: كل مستخدم يرى الأيقونات اللي علّمها له الأدمن فقط. لفتح كل الأيقونات للجميع مؤقتاً: اجعلها true */
+const OPEN_ALL_ICONS=false;
 const storedPages=u=>u.type==='admin'?Object.keys(PAGES):(u.pages||DEFP[u.type]||[]);
 const pagesOf=u=>(u.type==='admin'||OPEN_ALL_ICONS)?Object.keys(PAGES):storedPages(u);
 const can=p=>S.user&&pagesOf(S.user).includes(p);
@@ -5543,7 +5566,7 @@ function vPages(){
   const us=DB.users.filter(u=>u.type!=='admin');
   if(!us.length)return empty('لا يوجد مستخدمون بعد','أضف مستخدمين أولاً ثم حدد الصفحات المتاحة لكل منهم.');
   const ks=Object.keys(PAGES);
-  return `<p class="info">الأدمن يرى كل الصفحات دائماً. علّم الصفحات المتاحة لكل مستخدم. (حالياً كل الأيقونات مفتوحة للجميع ما عدا إدارة المستخدمين — الإعدادات هنا محفوظة لكنها غير مفعّلة)</p><div class="tbl matrix"><table><thead><tr><th>المستخدم</th>${ks.map(k=>`<th class="c">${PAGES[k]}</th>`).join('')}</tr></thead><tbody>${us.map(u=>`<tr><td>${esc(u.name)}<br><small style="color:var(--muted)">${TYPES[u.type]}</small></td>${ks.map(k=>`<td class="c"><input type="checkbox" data-a="togPage" data-id="${u.id}" data-k="${k}" ${storedPages(u).includes(k)?'checked':''} aria-label="${esc(u.name)} - ${PAGES[k]}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  return `<p class="info">الأدمن يرى كل الصفحات دائماً. علّم الصفحات المتاحة لكل مستخدم. (الصفحات المعلّمة هنا هي التي تفتح للمستخدم، وغير المعلّمة تظهر له مقفولة)</p><div class="tbl matrix"><table><thead><tr><th>المستخدم</th>${ks.map(k=>`<th class="c">${PAGES[k]}</th>`).join('')}</tr></thead><tbody>${us.map(u=>`<tr><td>${esc(u.name)}<br><small style="color:var(--muted)">${TYPES[u.type]}</small></td>${ks.map(k=>`<td class="c"><input type="checkbox" data-a="togPage" data-id="${u.id}" data-k="${k}" ${storedPages(u).includes(k)?'checked':''} aria-label="${esc(u.name)} - ${PAGES[k]}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
 /* ================= تقارير المرور: الحالات والسلال (نفس مسار سيستم الحوكمة) ================= */
@@ -6221,6 +6244,7 @@ async function fbFlush(force){
   if(!fbDb)return false;
   let ok=true;
   for(const k of Object.keys(DB)){
+    if(window._notLoaded&&window._notLoaded.has(k))continue; /* ماتكتبش نسخة فاضية فوق بيانات السحابة */
     try{
       const j=JSON.stringify(DB[k]);if(!force&&fbLast[k]===j)continue;
       const col=fbDb.collection('sys7_data'),by=S.user?S.user.name:'',at=firebase.firestore.FieldValue.serverTimestamp();
@@ -6242,18 +6266,22 @@ async function fbPull(){
   try{const q=await fbDb.collection('sys7_data').get();
     if(q.empty){fbFlush(true);return}
     let dirty=false;try{dirty=localStorage.getItem('sys7_dirty')==='1'}catch(e){}
+    let only=null;
     if(dirty){ /* في تعديلات محلية لسه ماترفعتش → ماتتكتبش فوقها بنسخة السحابة القديمة، ارفعها الأول */
       const ok=await fbFlush(true);if(typeof toast==='function')toast(ok?'☁️ تم رفع التعديلات المحلية غير المحفوظة':'⚠️ تعذّر رفع التعديلات المحلية ('+(window._fbErr||'')+')',ok?'ok':'err');
-      return}
+      if(!(window._notLoaded&&window._notLoaded.size))return;
+      only=window._notLoaded} /* النسخة المحلية المخفّفة: حمّل من السحابة المفاتيح الناقصة بس */
     const docs={};q.forEach(d=>{docs[d.id]=d.data()});
     Object.keys(docs).forEach(id=>{
       if(id.indexOf('__p')>0)return;
+      if(only&&!only.has(id))return;
       try{const x=docs[id];let j=x.j;
         if(j==null&&x.chunks){j='';for(let i=0;i<x.chunks;i++){const p=docs[id+'__p'+i];if(!p||p.p==null)throw new Error('جزء ناقص '+i);j+=p.p}}
         if(j==null)return;
         DB[id]=JSON.parse(j);fbLast[id]=j}catch(e){console.log('Firebase load key',id,e)}});
     if((DB.seedV||0)<SEED_V){importSeed();save()}mergeNursing();
-    mem=DB;try{localStorage.setItem(LS,JSON.stringify(DB))}catch(e){}
+    if(window._notLoaded)window._notLoaded.clear();
+    mem=DB;lsPersist();
     if(S.user){S.user=allUsers().find(u=>u.id===S.user.id)||S.user}render(true)}catch(e){console.log('Firebase load',e)}
 }
 if(fbDb){const p=firebase.auth?firebase.auth().signInAnonymously():Promise.resolve();p.then(fbPull,fbPull)}
@@ -6877,7 +6905,7 @@ const usBar=n=>`<div class="bar noprint"><input id="usq" placeholder="ابحث �
 V.um_list.r=function(){const [L,n]=usFilter();
   return `<div class="bar end"><button class="btn primary" data-a="go" data-v="um_add">${ico('plus',18)} إضافة مستخدم</button></div>${usBar(n)}<div class="tbl"><table><thead><tr><th>الاسم</th><th>الفئة الوظيفية</th><th>النوع</th><th>الصفحات</th><th></th></tr></thead><tbody>${[ADMIN,...L].map(u=>{const e=empOf(u);return `<tr><td>${esc(u.name)}</td><td>${e?esc(GLAB[e.g]+' — '+e.s):((DB.contracts||[]).some(c=>c.c===u.ec)?'الأطباء المتعاقدون':'—')}</td><td>${TYPES[u.type]}</td><td>${u.type==='admin'?'كل الصفحات':storedPages(u).map(p=>PAGES[p]).join('، ')||'—'}</td><td>${u.builtin?'<span class="chip t">أساسي</span>':`<button class="btn sm" data-a="editUser" data-id="${u.id}">تعديل</button> <button class="btn sm danger" data-a="delUser" data-id="${u.id}">حذف</button>`}</td></tr>`}).join('')}</tbody></table></div>`};
 V.um_pages.r=function(){const [L,n]=usFilter(),ks=Object.keys(PAGES);
-  return `<p class="info">الأدمن يرى كل الصفحات. علّم الصفحات المتاحة لكل مستخدم (الافتراضي حسب النوع). (حالياً كل الأيقونات مفتوحة للجميع ما عدا إدارة المستخدمين — الإعدادات هنا محفوظة لكنها غير مفعّلة)</p>${usBar(n)}<div class="tbl matrix"><table><thead><tr><th>المستخدم</th>${ks.map(k=>`<th class="c">${PAGES[k]}</th>`).join('')}</tr></thead><tbody>${L.map(u=>`<tr><td>${esc(u.name)}<br><small style="color:var(--muted)">${TYPES[u.type]}</small></td>${ks.map(k=>`<td class="c"><input type="checkbox" data-a="togPage" data-id="${u.id}" data-k="${k}" ${storedPages(u).includes(k)?'checked':''} aria-label="${esc(u.name)} - ${esc(PAGES[k])}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`};
+  return `<p class="info">الأدمن يرى كل الصفحات. علّم الصفحات المتاحة لكل مستخدم (الافتراضي حسب النوع). (الصفحات المعلّمة هنا هي التي تفتح للمستخدم، وغير المعلّمة تظهر له مقفولة)</p>${usBar(n)}<div class="tbl matrix"><table><thead><tr><th>المستخدم</th>${ks.map(k=>`<th class="c">${PAGES[k]}</th>`).join('')}</tr></thead><tbody>${L.map(u=>`<tr><td>${esc(u.name)}<br><small style="color:var(--muted)">${TYPES[u.type]}</small></td>${ks.map(k=>`<td class="c"><input type="checkbox" data-a="togPage" data-id="${u.id}" data-k="${k}" ${storedPages(u).includes(k)?'checked':''} aria-label="${esc(u.name)} - ${esc(PAGES[k])}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`};
 
 
 /* ================= دفاتر النوبتجيات: الإدخال ← طلبات قيد الموافقة ← الدفاتر (حسب ملف الوورد) ================= */
