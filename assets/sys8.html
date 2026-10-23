@@ -3619,7 +3619,7 @@ window.addEventListener('resize',function(){var q=document.querySelectorAll('.ft
 <script id="s3bridge">
 /* ===== جسر النوبتجيات: سيستم 8 ← سيستم 3 (ومنه سيستم 7) =====
    أي إضافة نوبتجيات في سيستم 8 بعد ما الأدمن يعتمدها (غرفة الحفظ) تتكتب في قاعدة سيستم 3 (مجموعة shifts)
-   كجدول معتمد بنفس شكل جداول سيستم 3 → بتظهر في دفاتر سيستم 3، وسيستم 7 بيسحبها بالاتصال المباشر بتاعه.
+   كجدول (بحالة pending_final لحد ما يتعتمد من سيستم 8 أو 3) → بيظهر في «طلبات قيد الموافقة ← نوبتجيات» في سيستم 3، وبعد الاعتماد هناك يدخل الدفاتر وسيستم 7 بيسحبه.
    - للأدمن فقط، والباسورد لا يُحفظ (يُستخدم للدخول بس).
    - لو اتلغى الاعتماد أو اتحذف الأرشيف في سيستم 8 → الجدول بيتشال من سيستم 3 (لو محدّش عدّل عليه هناك).
    - أي صف موجود فعلاً في جدول سيستم 3 لنفس القسم/الشهر/الفترة بيتخطّى (من غير تكرار). */
@@ -3691,7 +3691,7 @@ window.addEventListener('resize',function(){var q=document.querySelectorAll('.ft
    var key=cat+'|'+stp+'|'+(+dm[2])+'|'+dm[3];
    var o=g[key]||(g[key]={category:cat,type:type,shiftType:stp,month:+dm[2],year:+dm[3],rows:[]});
    o.rows.push({day:String(+dm[1]),staff:nm,attendance:v('f-att'),departure:v('f-dep'),notes:v('f-note')})});
-  return Object.keys(g).map(function(k){var o=g[k];o.rows.sort(function(a,b){return +a.day-+b.day});o.srcHash=h(JSON.stringify(o.rows));o.id='s8_'+h(e.sk||String(e.t))+'_'+h(k);o.sk=e.sk||'';o.by=e.u||'';return o})}
+  return Object.keys(g).map(function(k){var o=g[k];o.rows.sort(function(a,b){return +a.day-+b.day});o.srcHash=h(JSON.stringify(o.rows));o.id='s8_'+h(e.sk||String(e.t))+'_'+h(k);o.sk=e.sk||'';o.by=e.u||'';o.hf=(e.s==='hf');o.e=e;return o})}
  /* ---------- المزامنة ---------- */
  async function nativeKeys(cat,g,cache){
   if(!cache[cat])cache[cat]=await queryEq('category',cat);
@@ -3708,17 +3708,25 @@ window.addEventListener('resize',function(){var q=document.querySelectorAll('.ft
   var R={add:0,upd:0,del:0,dup:0,old:0,mod:0,fail:0,tot:0};
   try{
    var all=await arAllP(),want={};
-   all.filter(function(e){return e&&e.k==='shifts'&&e.s==='hf'&&e.h}).forEach(function(e){var gs=null;try{gs=parseS8(e)}catch(x){}if(!gs){R.old++;return}gs.forEach(function(g){want[g.id]=g})});
+   all.filter(function(e){return e&&e.k==='shifts'&&e.h}).forEach(function(e){var gs=null;try{gs=parseS8(e)}catch(x){}if(!gs){R.old++;return}gs.forEach(function(g){want[g.id]=g})});
    var ex={};(await queryEq('sourceSystem',SRC)).forEach(function(x){ex[x.id]=x.data});
    var cache={},now=new Date().toISOString();
    for(var id in want){
     var g=want[id],cur=ex[id];R.tot++;
     try{
-     if(cur&&cur.s8src===g.srcHash)continue; /* محدّث */
+     var isHf=!!g.hf;
+     if(cur){
+      if(cur.status==='rejected'){R.rej=(R.rej||0)+1;continue} /* اترفض في سيستم 3 — منلمسوش */
+      if(cur.status==='approved'&&cur.s8st!=='hf'&&!isHf){ /* اتعتمد من سيستم 3 → نعتمده في أرشيف سيستم 8 */
+       if(typeof window.arMove==='function'&&g.e){window.arMove(g.e,'hf');R.mv=(R.mv||0)+1}
+       continue}
+      if(cur.s8src===g.srcHash&&((cur.s8st==='hf')===isHf))continue; /* محدّث */
+     }
      if(cur&&h(JSON.stringify(cur.data||[]))!==cur.s8hash){R.mod++;continue} /* اتعدّل في سيستم 3 — منلمسوش */
      var nat=await nativeKeys(g.category,g,cache),rows=g.rows.filter(function(r){return !nat[r.day+'|'+norm(r.staff)]});
      if(!rows.length){R.dup++;if(cur){await api('DELETE',FS+'/'+COL+'/'+id)}continue}
-     var doc={type:g.type,category:g.category,shiftType:g.shiftType,month:g.month,year:g.year,username:g.by||S.name,dept:'',data:rows,status:'approved',finalApprovedBy:S.name,approvedBy:S.name,sourceSystem:SRC,s8link:true,s8sk:g.sk,s8src:g.srcHash,s8hash:h(JSON.stringify(rows)),finalApprovedAt:{__ts:now},createdAt:(cur&&cur.createdAt)||{__ts:now}};
+     var doc={type:g.type,category:g.category,shiftType:g.shiftType,month:g.month,year:g.year,username:g.by||S.name,dept:'',data:rows,status:isHf?'approved':'pending_final',s8st:isHf?'hf':'in',sourceSystem:SRC,s8link:true,s8sk:g.sk,s8src:g.srcHash,s8hash:h(JSON.stringify(rows)),submittedBySys8At:{__ts:now},createdAt:(cur&&cur.createdAt)||{__ts:now}};
+     if(isHf){if(cur&&cur.status==='approved'&&cur.finalApprovedBy){doc.finalApprovedBy=cur.finalApprovedBy;doc.approvedBy=cur.approvedBy||cur.finalApprovedBy;if(cur.finalApprovedAt)doc.finalApprovedAt=cur.finalApprovedAt}else{doc.finalApprovedBy=S.name;doc.approvedBy=S.name;doc.finalApprovedAt={__ts:now}}}
      var f={};Object.keys(doc).forEach(function(k){f[k]=enc(doc[k])});
      await api('PATCH',FS+'/'+COL+'/'+id,{fields:f});
      if(cur)R.upd++;else R.add++;
@@ -3730,7 +3738,7 @@ window.addEventListener('resize',function(){var q=document.querySelectorAll('.ft
   }catch(e){S.err=(e&&e.message)||String(e);if(e&&(e.status===401||e.status===403))S.err+=' — الحساب ده مالوش صلاحية الكتابة في قاعدة سيستم 3 (تأكد إنه حساب الأدمن)'}
   S.busy=false;paint();
   if(manual&&S.last&&!S.err)toast(summary(S.last))}
- function summary(R){return '✔ تمت المزامنة — جداول جديدة '+R.add+'، محدّثة '+R.upd+'، اتشالت '+R.del+(R.dup?'، مكررة اتخطّت '+R.dup:'')+(R.mod?'، معدّلة في سيستم 3 (متلمسّتش) '+R.mod:'')+(R.old?'، أرشيف قديم الشكل '+R.old:'')+(R.fail?'، فشل '+R.fail:'')}
+ function summary(R){return '✔ تمت المزامنة — جداول جديدة '+R.add+'، محدّثة '+R.upd+'، اتشالت '+R.del+(R.dup?'، مكررة اتخطّت '+R.dup:'')+(R.mv?'، اتعتمدت من سيستم 3 ونُقلت لغرفة الحفظ هنا '+R.mv:'')+(R.rej?'، مرفوضة في سيستم 3 '+R.rej:'')+(R.mod?'، معدّلة في سيستم 3 (متلمسّتش) '+R.mod:'')+(R.old?'، أرشيف قديم الشكل '+R.old:'')+(R.fail?'، فشل '+R.fail:'')}
  function toast(m){try{var t=document.createElement('div');t.setAttribute('data-ui','1');t.textContent=m;t.style.cssText='position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#111;color:#fff;border:3px solid #ffd600;padding:10px 20px;border-radius:999px;font-weight:900;z-index:100001;max-width:92%;text-align:center;font-family:inherit';document.body.appendChild(t);setTimeout(function(){t.remove()},6000)}catch(e){}}
  /* ---------- الواجهة (للأدمن فقط) ---------- */
  function ensureUI(){
@@ -3756,7 +3764,7 @@ window.addEventListener('resize',function(){var q=document.querySelectorAll('.ft
   var b=$('s3bBtn');if(!b)return;
   var i=b.querySelector('i');i.className=S.busy?'wk':(S.err?'er':(S.tok?'ok':''));
   var bx=$('s3bBox');if(!bx||!bx.classList.contains('on'))return;
-  var hs='<div class="c"><h3>🔗 ربط النوبتجيات بسيستم 3 و7</h3><p>أي نوبتجيات بتتضاف في سيستم 8 وتتعتمد (تروح غرفة الحفظ) بتتكتب كجداول معتمدة في قاعدة سيستم 3، فتظهر في دفاتره، وسيستم 7 بيسحبها بالاتصال المباشر بتاعه. لو رجّعت الاعتماد أو حذفت الأرشيف هنا، الجدول بيتشال من سيستم 3. الباسورد مش بيتحفظ.</p>';
+  var hs='<div class="c"><h3>🔗 ربط النوبتجيات بسيستم 3 و7</h3><p>أي نوبتجيات بتتضاف في سيستم 8 وتتعتمد (تروح غرفة الحفظ) بتتكتب في قاعدة سيستم 3 بحالة «بانتظار الاعتماد النهائي»، فتظهر في سيستم 3 تحت «طلبات قيد الموافقة ← نوبتجيات»، وبعد اعتمادك هناك تدخل الدفاتر وسيستم 7 بيسحبها بالاتصال المباشر بتاعه. لو رجّعت الاعتماد أو حذفت الأرشيف هنا، الجدول بيتشال من سيستم 3. الباسورد مش بيتحفظ.</p>';
   if(!S.tok){hs+='<label>كود الموظف (حساب الأدمن في نظام النوبتجيات)</label><input id="s3bC" inputmode="numeric" autocomplete="off" value="'+(S.code||'').replace(/"/g,'')+'"><label>كلمة المرور</label><input id="s3bP" type="password" autocomplete="off"><div><button class="pri" id="s3bGo">دخول وربط</button><button class="sec" id="s3bX">إغلاق</button></div>'}
   else{hs+='<div class="st">الحالة: '+(S.busy?'⏳ جارٍ المزامنة…':'🟢 متصل بسيستم 3 — المزامنة تلقائية كل ثواني بعد أي اعتماد')+(S.at?'<br>آخر مزامنة: '+new Date(S.at).toLocaleTimeString('ar-EG'):'')+'</div>';
    if(S.last)hs+='<div class="st">'+summary(S.last).replace('✔ تمت المزامنة — ','')+'</div>';
