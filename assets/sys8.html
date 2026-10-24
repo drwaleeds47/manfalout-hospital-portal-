@@ -3553,7 +3553,7 @@ var CSS="\nhtml body .page .foot.c.fxlock{display:block!important;margin-top:aut
 function inj(h){
  if(typeof h!=="string")return h;
  h=h.replace(/<style id="fxfoot-css">[\s\S]*?<\/style>/,"").replace(/<script id="fxfoot-js">[\s\S]*?<\/script>/,"");
- var i=h.lastIndexOf("</head>");
+ var i=(function(x){var m=x.search(/<\/head>\s*<body[\s>]/);return m>-1?m:x.lastIndexOf("</head>")})(h);
  var add='<style id="fxfoot-css">'+CSS+'</style><script id="fxfoot-js">'+JS.replace(/<\//g,"<\\/")+'<\/script>';
  return i>-1?h.slice(0,i)+add+h.slice(i):add+h}
 try{var _o=window.docOf;if(typeof _o==="function")window.docOf=function(k){return inj(_o(k))}}catch(e){}
@@ -3572,8 +3572,8 @@ t();setInterval(t,700)})();
 var AG=null;
 function getAg(o){if(AG!==null)return AG;try{var h=o('letter'),m=h.match(/<style id="agfmt">[\s\S]*?<\/style>/);AG=m?m[0]:""}catch(e){AG=""}return AG}
 try{var _o=window.docOf;if(typeof _o==="function")window.docOf=function(k){var h=_o(k);
- if(typeof h==="string"&&/^(f_|dcatt$)/.test(k)&&h.indexOf('id="agfmt"')<0){var c=getAg(_o);if(c){var i=h.lastIndexOf("</head>");h=i>-1?h.slice(0,i)+c+h.slice(i):c+h}}
-  if(k==="dcatt"&&typeof h==="string"&&h.indexOf('id="fxdcatt"')<0){var st='<style id="fxdcatt">html body .page th{background:#c6ff1a!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style>';var q=h.lastIndexOf("</head>");h=q>-1?h.slice(0,q)+st+h.slice(q):st+h}
+ if(typeof h==="string"&&/^(f_|dcatt$)/.test(k)&&h.indexOf('id="agfmt"')<0){var c=getAg(_o);if(c){var i=(function(x){var m=x.search(/<\/head>\s*<body[\s>]/);return m>-1?m:x.lastIndexOf("</head>")})(h);h=i>-1?h.slice(0,i)+c+h.slice(i):c+h}}
+  if(k==="dcatt"&&typeof h==="string"&&h.indexOf('id="fxdcatt"')<0){var st='<style id="fxdcatt">html body .page th{background:#c6ff1a!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style>';var q=(function(x){var m=x.search(/<\/head>\s*<body[\s>]/);return m>-1?m:x.lastIndexOf("</head>")})(h);h=q>-1?h.slice(0,q)+st+h.slice(q):st+h}
  return h}}catch(e){}
 })();
 </script>
