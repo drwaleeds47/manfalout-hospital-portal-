@@ -337,7 +337,10 @@ function __v18(){
    if(!r.ok){var e=new Error('http '+r.status);e.code=(r.status===401||r.status===403)?'invalid_argument':(r.status===429?'resource_exhausted':'unavailable');throw e}
    return r.json();
   }
-  return {collection:function(c){return {
+  return {users:async function(){
+    var res=await call('POST',base+':runQuery',{structuredQuery:{from:[{collectionId:'ls'}],where:{compositeFilter:{op:'AND',filters:[{fieldFilter:{field:{fieldPath:'k'},op:'GREATER_THAN_OR_EQUAL',value:{stringValue:'um:u:'}}},{fieldFilter:{field:{fieldPath:'k'},op:'LESS_THAN',value:{stringValue:'um:u;'}}}]}}}});
+    var docs=[];(res||[]).forEach(function(x){if(x.document){var o=dec(x.document);docs.push({data:function(){return o}})}});return docs},
+  collection:function(c){return {
    doc:function(id){var u=base+'/'+c+'/'+id;return {
     get:async function(){var r=await call('GET',u);var o=r?dec(r):null;return {id:id,exists:!!r,data:function(){return o||undefined},metadata:{}}},
     set:async function(x){await call('PATCH',u,enc(x))},
@@ -352,7 +355,7 @@ function __v18(){
       var wasFirst=first;first=false;
       next({docs:docs,size:docs.length,metadata:{fromCache:false},docChanges:function(){return docs.map(function(d){return {type:'added',doc:d}})}});
      }catch(e){if(first&&err&&e.code!=='resource_exhausted'){err(e);dead=true;return}}
-     setTimeout(poll,document.hidden?120000:30000);
+     setTimeout(poll,document.hidden?180000:60000);
     }
     document.addEventListener('visibilitychange',function(){if(!document.hidden&&!dead)poll()});
     poll();return function(){dead=true};
@@ -360,6 +363,7 @@ function __v18(){
  }
  function startSync(){
   st.mode='sync';setTimeout(finishFirst,10000);
+  if(st.db&&st.db.users){(async function(){for(var a=0;a<4;a++){try{var ds=await st.db.users();for(var i=0;i<ds.length;i++)await remote(ds[i]);return}catch(e){await new Promise(function(z){setTimeout(z,4000)})}}})()}
   st.db.collection('ls').onSnapshot(function(snap){enq(async function(){
     var ch=snap.docChanges();for(var i=0;i<ch.length;i++){if(ch[i].type!=='removed')await remote(ch[i].doc)}
     if(!st.ready&&!snap.metadata.fromCache)finishFirst()})},
@@ -2544,7 +2548,11 @@ function resolveUser(em){
  if(r){
   if(r.active===false){block('⛔','تم إيقاف حسابك','تواصل مع مدير النظام لإعادة تفعيله.');return}
   ME=r;ADMIN=!!r.admin;P=normPerms(r.perms);SIG=JSON.stringify(r);unblock();ready();return}
- if(Date.now()-T0>20000){block('🔒','حسابك غير مسجّل في قائمة المستخدمين','لو لسه مضاف حالاً استنى دقيقة وجرّب تاني. ولو المشكلة مستمرة اطلب من المدير مراجعة قواعد Firestore.');return}
+ if(Date.now()-T0>20000){
+  var cool=window.__fsCool&&Date.now()<window.__fsCool;
+  if(cool)block('⏳','المزامنة متوقفة مؤقتًا','حد الاستخدام اليومي لـ Firebase خلص، فمش قادر أحمّل صلاحياتك على الجهاز ده. هيتجدد تلقائي (حوالي 10 صباحًا بتوقيت مصر) وهتتحمّل الصلاحيات لوحدها من غير ما تعمل حاجة.');
+  else block('🔒','لسه مش لاقي حسابك','لو لسه مضاف حالاً أو النت ضعيف استنى شوية — بحاول تاني تلقائي. ولو المشكلة مستمرة اطلب من المدير يراجع بياناتك في المستخدمين.');
+  setTimeout(function(){resolveUser(em)},4000);return}
  block('⏳','جاري تحميل صلاحياتك…','');
  setTimeout(function(){resolveUser(em)},600)}
 
