@@ -179,7 +179,7 @@ function __v18(){
  var EX=/^(portal:last|__sync)/,META='__syncmeta',L=null;
  try{L=window.localStorage}catch(e){}
  if(!L)return;
- var st={db:null,dl:null,ready:false,canWrite:true,meta:{},hs:{},seen:{},firstApplied:false,busy:false,mode:'init',last:0,banner:false,lp:{},cn:{},paused:false};try{st.cn=JSON.parse(L.getItem('__synccn')||'{}')||{}}catch(e){st.cn={}}
+ var st={db:null,dl:null,ready:false,canWrite:true,meta:{},hs:{},seen:{},firstApplied:false,busy:false,mode:'init',last:0,banner:false,lp:{},cn:{},paused:false,arp:{},arOn:false,arLoading:false};try{st.cn=JSON.parse(L.getItem('__synccn')||'{}')||{}}catch(e){st.cn={}}try{st.arp=JSON.parse(L.getItem('__syncarp')||'{}')||{}}catch(e){st.arp={}}function saveArp(){try{L.setItem('__syncarp',JSON.stringify(st.arp))}catch(e){}}
  try{st.meta=JSON.parse(L.getItem(META)||'{}')}catch(e){}
  try{st.hs=JSON.parse(L.getItem('__synchash')||'{}')}catch(e){}
  function saveMeta(){try{L.setItem(META,JSON.stringify(st.meta));L.setItem('__synchash',JSON.stringify(st.hs));L.setItem('__synccn',JSON.stringify(st.cn))}catch(e){}}
@@ -211,6 +211,7 @@ function __v18(){
   else if(st.paused){t='⏸ إيقاف مؤقت للمزامنة';c='warn';m='الجهاز ده وصل لحد الأمان اليومي للكتابة على Firebase. البيانات محفوظة على الجهاز وهتتزامن تلقائي بكرة، أو اضغط استئناف المزامنة.'}
   else if(st.mode==='local'){t='💾 على هذا الجهاز فقط';c='warn';m='الصفحة مفتوحة من ملف، فالبيانات متحفوظة على الجهاز ده بس. افتحها من رابط النظام علشان تتزامن مع باقي الأجهزة.'}
   else if(st.mode==='nodb'){t='⚠ بدون مزامنة';c='warn';m='المزامنة مش متاحة دلوقتي (سجّل دخول في claude.ai أو اطلب صلاحية من المسؤول). البيانات بتتحفظ على الجهاز ده بس.'}
+  else if(window.__fsCool&&Date.now()<window.__fsCool){t='⏳ Firebase مشغول';c='warn';m='الحد اليومي لـ Firebase خلص أو الضغط عالي. بنعيد المحاولة تلقائي بعد '+Math.ceil((window.__fsCool-Date.now())/1000)+' ثانية.'}
   else if(st.mode==='init'){t='☁ جاري الاتصال…';m='بنحمّل البيانات المحفوظة.'}
   else if(!st.canWrite){t='🔒 قراءة فقط';c='warn';m='معاك صلاحية عرض بس. التعديلات مش هتتحفظ للباقي. اطلب صلاحية "مساهم".'}
   else if(st.mode==='error'){t='☁ جاري المحاولة…';c='warn';m=st.errMsg||'حصل خطأ في المزامنة. هنحاول تاني تلقائي.'}
@@ -230,6 +231,7 @@ function __v18(){
  async function remote(doc){
   var d=doc.data();if(!d||typeof d.k!=='string'||EX.test(d.k))return;var k=d.k,rt=d.t||0;
   if(rt<=(st.meta[k]||0))return;if(d.del)delete st.cn[k];else if(typeof d.n==='number')st.cn[k]=d.n;
+  if(k.indexOf('ar:')===0){if(d.del){if(st.arp[k]){delete st.arp[k];saveArp()}}else if(!st.arOn){st.arp[k]={t:rt,n:d.n||0};saveArp();return}}
   if(d.del){if(k.indexOf('ar:')===0){try{if(window.__arDelIn)await window.__arDelIn(k)}catch(e){}st.meta[k]=rt;saveMeta();return}try{L.removeItem(k)}catch(e){}delete st.hs[k];delete st.seen[k];st.meta[k]=rt;saveMeta();applied();return}
   var id=hash(k),parts=[];
   for(var i=0;i<(d.n||0);i++){var s=await st.db.collection('lsc').doc(id+'_'+i).get();var sd=s.exists&&s.data();if(!sd||sd.t!==rt)return;parts.push(sd.d)}
@@ -239,6 +241,25 @@ function __v18(){
   st.hs[k]=hash(v);st.seen[k]=v;st.meta[k]=rt;saveMeta();applied();
  }
  function applied(){if(st.ready){st.banner=true;paint()}else st.firstApplied=true}
+ window.__arLoad=function(){
+  st.arOn=true;if(st.arLoading)return;
+  var ks=Object.keys(st.arp);if(!ks.length||!st.db)return;
+  ks.sort(function(a,b){return (st.arp[b].t||0)-(st.arp[a].t||0)});
+  st.arLoading=true;
+  enq(async function(){
+   var done=0,stopped=false;
+   try{
+    for(var i=0;i<ks.length;i++){
+     var k=ks[i],p=st.arp[k];if(!p)continue;
+     if(window.__fsCool&&Date.now()<window.__fsCool){stopped=true;toast('Firebase مشغول دلوقتي — هنكمل تحميل الأرشيف لما يفتح تاني');break}
+     if(ks.length>3)toast('تحميل الأرشيف '+(i+1)+' من '+ks.length+'…');
+     try{await remote({data:function(){return {k:k,t:p.t,n:p.n,del:false}}})}catch(e){stopped=true;break}
+     if((st.meta[k]||0)>=p.t){delete st.arp[k];saveArp();done++}
+    }
+   }finally{st.arLoading=false}
+   if(!stopped&&done)toast('✔ تم تحميل الأرشيف')
+  });
+ };
  function finishFirst(){
   if(st.ready)return;st.ready=true;st.mode='sync';
   if(st.firstApplied){try{if(!sessionStorage.getItem('__syncrl')){sessionStorage.setItem('__syncrl','1');location.reload();return}}catch(e){}st.banner=true}
@@ -370,14 +391,25 @@ function __v18(){
     poll();return function(){dead=true};
    }}}};
  }
- function startSync(){
+  function startSync(){
   st.mode='sync';setTimeout(finishFirst,10000);
   var __hasU=false;try{for(var __i=0;__i<L.length;__i++){if(String(L.key(__i)).indexOf('um:u:')===0){__hasU=true;break}}}catch(e){}
-  if(st.db&&st.db.users&&!__hasU){(async function(){for(var a=0;a<4;a++){try{var ds=await st.db.users();for(var i=0;i<ds.length;i++)await remote(ds[i]);return}catch(e){await new Promise(function(z){setTimeout(z,4000)})}}})()}
-  st.db.collection('ls').onSnapshot(function(snap){enq(async function(){
-    var ch=snap.docChanges();for(var i=0;i<ch.length;i++){if(ch[i].type!=='removed')await remote(ch[i].doc)}
-    if(!st.ready&&!snap.metadata.fromCache)finishFirst()})},
-   function(){st.mode='error';st.errMsg='انقطع الاتصال بقاعدة البيانات';paint()});
+  function __go(){
+   st.db.collection('ls').onSnapshot(function(snap){enq(async function(){
+     var ch=snap.docChanges();for(var i=0;i<ch.length;i++){if(ch[i].type!=='removed')await remote(ch[i].doc)}
+     if(!st.ready&&!snap.metadata.fromCache)finishFirst()})},
+    function(){st.mode='error';st.errMsg='انقطع الاتصال بقاعدة البيانات';paint()});
+  }
+  if(st.db&&st.db.users&&!__hasU){
+   /* الأول: قائمة المستخدمين والصلاحيات بس (قراءات قليلة)، وبنعيد المحاولة لحد ما تنجح */
+   (async function(){
+    for(var a=0;a<80;a++){
+     try{var ds=await st.db.users();for(var i=0;i<ds.length;i++)await remote(ds[i]);break}
+     catch(e){var w=4000,cl=window.__fsCool||0;if(cl>Date.now())w=Math.max(w,cl-Date.now()+500);w=Math.min(w,300000);await new Promise(function(z){setTimeout(z,w)})}
+    }
+    __go();
+   })();
+  }else __go();
  }
  /* ---------- تشغيل ---------- */
  document.addEventListener('DOMContentLoaded',function(){
@@ -904,7 +936,7 @@ function docOf(k){var h=docOf0(k);if(["letter", "req", "minutes", "lg", "tasks",
 var main=document.querySelector("main");
 function open_(k){
  document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("on",t.dataset.k==k)});
- document.getElementById("home").classList.toggle("on",k=="home");document.getElementById("arch").classList.toggle("on",k=="arch");if(k=="arch")arRender();
+ document.getElementById("home").classList.toggle("on",k=="home");document.getElementById("arch").classList.toggle("on",k=="arch");if(k=="arch"){arRender();try{window.__arLoad&&window.__arLoad()}catch(e){}}
  document.querySelectorAll("iframe").forEach(function(f){f.classList.toggle("on",f.dataset.k==k)});
  if(k!="home"&&k!="arch"&&!main.querySelector('iframe[data-k="'+k+'"]')){var f=document.createElement("iframe");f.dataset.k=k;f.className="on";f.title=k;f.srcdoc=docOf(k);main.appendChild(f)}
  document.getElementById("bkBtn").classList.toggle("on",k!="home");window.cur=k;document.getElementById("saveBtn").classList.toggle("off",k=="home"||k=="arch");try{localStorage.setItem("portal:last",k)}catch(e){}
@@ -2554,10 +2586,11 @@ function hookDocs(){
 
 /* ---------- شاشة الانتظار / الحظر ---------- */
 function logout(){try{L.removeItem('__syncauth')}catch(e){}location.reload()}
-function block(ic,title,msg){
+function block(ic,title,msg,retry){
  var o=$('#umBlock');if(!o){o=el('div');o.id='umBlock';document.body.appendChild(o)}
  o.textContent='';var bx=el('div','bx');
  bx.appendChild(el('div','bi',ic));bx.appendChild(el('div','bt',title));if(msg)bx.appendChild(el('div','bm',msg));
+ if(retry){var rb=el('button','um-btn','🔄 إعادة المحاولة');rb.type='button';rb.onclick=function(){location.reload()};bx.appendChild(rb)}
  var bt=el('button','um-btn p','🚪 تسجيل خروج');bt.type='button';bt.onclick=logout;bx.appendChild(bt);
  o.appendChild(bx)}
 function unblock(){var o=$('#umBlock');if(o)o.remove()}
@@ -2574,10 +2607,11 @@ function resolveUser(em){
   ME=r;ADMIN=!!r.admin;P=normPerms(r.perms);SIG=JSON.stringify(r);unblock();ready();return}
  if(Date.now()-T0>20000){
   var cool=window.__fsCool&&Date.now()<window.__fsCool;
-  if(cool)block('⏳','جاري تحميل صلاحياتك…','');
-  else block('🔒','لسه مش لاقي حسابك','لو لسه مضاف حالاً أو النت ضعيف استنى شوية — بحاول تاني تلقائي. ولو المشكلة مستمرة اطلب من المدير يراجع بياناتك في المستخدمين.');
+  if(cool){var __sec=Math.max(1,Math.ceil((window.__fsCool-Date.now())/1000));block('⏳','Firebase مشغول دلوقتي','الحد اليومي للقراءة خلص أو الضغط عالي. بنعيد المحاولة تلقائي بعد '+(__sec>90?Math.ceil(__sec/60)+' دقيقة':__sec+' ثانية')+'. لو فضلت كده كلّم مدير النظام.',true)}
+  else if(typeof navigator!=='undefined'&&navigator.onLine===false)block('📡','مفيش اتصال بالإنترنت','اتأكد من النت وهنحاول تاني تلقائي.',true)
+  else block('🔒','لسه مش لاقي حسابك','لو لسه مضاف حالاً أو النت ضعيف استنى شوية — بحاول تاني تلقائي. ولو المشكلة مستمرة اطلب من المدير يراجع بياناتك في المستخدمين.',true);
   setTimeout(function(){resolveUser(em)},4000);return}
- block('⏳','جاري تحميل صلاحياتك…','');
+ block('⏳','جاري تحميل صلاحياتك…','أول مرة على الجهاز ده ممكن ياخد لحظات حسب سرعة النت.');
  setTimeout(function(){resolveUser(em)},600)}
 
 var built=false;
@@ -3685,7 +3719,7 @@ var _p=open_;
 open_=function(k){
  if(k==='arch'){
   if(!isAdm()){var r0=_p('home');try{toast('🔒 الأرشيف للأدمن فقط')}catch(e){}return r0}
-  var r=_p('users');show('arch');return r}
+  var r=_p('users');show('arch');try{window.__arLoad&&window.__arLoad()}catch(e){}return r}
  var r2=_p(k);
  if(k==='users'&&isAdm()){show('')}
  return r2};
