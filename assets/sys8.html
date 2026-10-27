@@ -3213,8 +3213,8 @@ function parseEntry(e){try{
 function hidK(){var o=[];['ldg:hid','ldg:hid:bk'].forEach(function(k){try{JSON.parse(localStorage.getItem(k)||'[]').forEach(function(x){if(o.indexOf(x)<0)o.push(x)})}catch(e){}});return o}
 function setHid(a){var j=JSON.stringify(a);['ldg:hid','ldg:hid:bk'].forEach(function(k){try{localStorage.setItem(k,j)}catch(e){}})}
 function pbg(p){return p==='سهر مسائي'?'#ffcc80':p==='سهر'?'#d1c4e9':'#fff59d'}
-/* حذف نهائي: صف 1/10/2026 الزيادة في عيادة الأسنان المسائية */
-function permHide(r){return r.date==='1/10/2026'&&/اسنان|أسنان/.test((r.sec||'')+' '+(r.dept||''))}
+/* حذف نهائي: كل سجلات شهر 10/2026 من دفتر النوبتجيات (المستندات الأصلية في الأرشيف لا تُمسّ) */
+function permHide(r){return /^\d{1,2}\/0?10\/2026$/.test((r.date||'').trim())}
 function loadLedger(cb){arAll(function(all){var map={};
  all.filter(function(e){return e.k==='shifts'&&e.s==='hf'}).forEach(function(e){parseEntry(e).forEach(function(r){var k=r.dept+'|'+(r.sec||'')+'|'+r.date+'|'+r.per;r.key=k;if(hidK().indexOf(k)>-1||permHide(r))return;var k2=k+'|'+r.names.join('،')+'|'+(r.note||'');if(!map[k2]||map[k2].t<r.t)map[k2]=r})});
  var rows=Object.keys(map).map(function(k){return map[k]});
