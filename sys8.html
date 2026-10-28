@@ -2556,7 +2556,7 @@ if(window.__umInit)return;window.__umInit=1;
 var L=null;try{L=window.localStorage}catch(e){}
 var CFG=window.__FB||null;
 var OWNER=String((CFG&&CFG.email)||'').toLowerCase();
-var PFX='um:u:',DOMN='@users.manfalut.app',API='https://identitytoolkit.googleapis.com/v1/accounts:';
+var __MEMU={};var PFX='um:u:',DOMN='@users.manfalut.app',API='https://identitytoolkit.googleapis.com/v1/accounts:';
 var ACTS=[['save','💾','الحفظ في الأرشيف'],['dl','⬇','تحميل Word / Excel / PDF'],['print','🖨','الطباعة']];
 var ME=null,ADMIN=false,P={docs:[],sys:false,act:{}},T0=Date.now(),SIG='';
 
@@ -2568,8 +2568,13 @@ function curEmail(){try{return String(L.getItem('__syncmail')||'').toLowerCase()
 
 /* ---------- تخزين المستخدمين (بيتزامن تلقائي مع Firebase عن طريق طبقة المزامنة الموجودة) ---------- */
 function allUsers(){var out=[];if(!L)return out;for(var i=0;i<L.length;i++){var k=L.key(i);if(k&&k.indexOf(PFX)===0){try{var r=JSON.parse(L.getItem(k));if(r&&r.id)out.push(r)}catch(e){}}}
+ Object.keys(__MEMU).forEach(function(id){var m=__MEMU[id],f=false;for(var j=0;j<out.length;j++)if(out[j].id===id){out[j]=m;f=true}if(!f)out.push(m)});
  out.sort(function(a,b){return (a.created||0)-(b.created||0)});return out}
-function saveUser(r){L.setItem(PFX+r.id,JSON.stringify(r))}
+function __freeSpace(){var n=0;try{var ks=[];for(var i=0;i<L.length;i++){var k=L.key(i);if(k&&k.indexOf('pg:')===0)ks.push(k)}ks.forEach(function(k){try{L.removeItem(k);n++}catch(e){}})}catch(e){}return n}
+function saveUser(r){var j=JSON.stringify(r),k=PFX+r.id;
+ try{L.setItem(k,j);delete __MEMU[r.id];return true}catch(e1){
+  __freeSpace();
+  try{L.setItem(k,j);delete __MEMU[r.id];return true}catch(e2){__MEMU[r.id]=r;return false}}}
 function delUser(id){L.removeItem(PFX+id);try{L.removeItem('__syncpw:'+id)}catch(e){}}
 var __SEED={};
 function findByEmail(em){var l=allUsers();for(var i=0;i<l.length;i++)if(String(l[i].email||'').toLowerCase()===em)return l[i];var sd=__SEED[String(em||'').toLowerCase()];return sd?JSON.parse(JSON.stringify(sd)):null}
@@ -3095,7 +3100,9 @@ function openEditor(u){
     if(CFG&&CFG.apiKey){rec.email=await fbCreateByName(name,pw);rec.username=rec.email.split('@')[0];rec.login=/^[a-z0-9._-]+$/i.test(String(name).trim())?rec.username:name}else{rec.username=genUser();rec.email=rec.username+DOMN;rec.login=rec.username}
    }catch(e){bs.disabled=false;bs.textContent='💾 إنشاء المستخدم';return fail(e.message&&e.message!=='Failed to fetch'?e.message:'تعذر الاتصال بـ Firebase، جرّب تاني.')}
   }
-  saveUser(rec);closeOv(w.o);renderUsers();syncNow(null,true,[rec]);
+  var __ok=true;try{__ok=saveUser(rec)}catch(ex){bs.disabled=false;bs.textContent=isNew?'💾 إنشاء المستخدم':'💾 حفظ التعديلات';return fail('تعذر الحفظ: '+(ex&&ex.message||ex))}
+  closeOv(w.o);renderUsers();try{syncNow(null,true,[rec])}catch(ex){}
+  if(!__ok)say('⚠ تخزين المتصفح ممتلئ — التعديل اتبعت لـ Firebase وهيظهر بعد المزامنة. فضّي بيانات الموقع من إعدادات المتصفح.');
   if(isNew){pwStore(rec.id,rec.login||rec.username,pw,name);showCreds(name,rec.login||rec.username,pw,'✔ تم إنشاء المستخدم')}else say('✔ تم حفظ التعديلات')}
  setTimeout(function(){iN.focus()},50)}
 
