@@ -190,7 +190,7 @@ function __v18(){
  try{st.meta=JSON.parse(L.getItem(META)||'{}')}catch(e){}
  try{st.hs=JSON.parse(L.getItem('__synchash')||'{}')}catch(e){}
  function saveMeta(){try{L.setItem(META,JSON.stringify(st.meta));L.setItem('__synchash',JSON.stringify(st.hs));L.setItem('__synccn',JSON.stringify(st.cn))}catch(e){}}
- var WLIM=10000,MINGAP_S=15000,MINGAP_L=60000;
+ var WLIM=10000,MINGAP_S=15000,MINGAP_L=60000;window.__syncDiag={err:null,pushOk:0,pushFail:0,pollOk:0,pollFail:0,lastPoll:null};
  function today(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
  function useGet(){var u=null;try{u=JSON.parse(L.getItem('__syncuse')||'null')}catch(e){}if(!u||u.d!==today())u={d:today(),r:0,w:0,x:0,k:{}};if(!u.k)u.k={};return u}
  function useAdd(f,n){try{var u=useGet();u[f]=(u[f]||0)+n;L.setItem('__syncuse',JSON.stringify(u))}catch(e){}}
@@ -300,9 +300,9 @@ function __v18(){
     await ref.set({k:k,t:t,n:parts.length,del:false})}st.cn[k]=parts.length;keyAdd(k,parts.length+1);
     for(var m=parts.length;m<pn;m++)await st.db.collection('lsc').doc(id+'_'+m).delete();
     if(k.indexOf('ar:')!==0){st.hs[k]=hash(v);st.seen[k]=v;__base[k]=v;__saveBase()}}
-   saveMeta();st.last=Date.now();if(st.mode==='error'){st.mode='sync'}paint();
+   saveMeta();st.last=Date.now();try{window.__syncDiag.pushOk++}catch(x){}if(st.mode==='error'){st.mode='sync'}paint();
   }catch(e){
-   st.meta[k]=old;var c=e&&e.code;
+   st.meta[k]=old;var c=e&&e.code;try{window.__syncDiag.pushFail++;if(!window.__syncDiag.err||Date.now()-window.__syncDiag.err.t>2000)window.__syncDiag.err={w:'push '+k.slice(0,14),s:String(e&&e.message),t:Date.now()}}catch(x){}
    if(c==='invalid_argument'){st.canWrite=false;setTimeout(function(){st.canWrite=true},60000)}else if(c==='quota_exceeded'){st.mode='error';st.errMsg='مساحة قاعدة البيانات امتلأت'}else if(c==='resource_exhausted'){st.mode='error';st.errMsg='حد الاستخدام اليومي لـ Firebase خلص مؤقتًا — هنحاول تاني تلقائي'}else{st.mode='error';st.errMsg=null}
    paint();throw e}
  }
@@ -388,7 +388,7 @@ function __v18(){
   async function call(method,url,body){
    if(window.__fsCool&&Date.now()<window.__fsCool){var e0=new Error('http 429 (cooldown)');e0.code='resource_exhausted';throw e0}var t=await fbToken(cfg),r=await __tf(url,{method:method,headers:{'Authorization':'Bearer '+t,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined},25000);if(r.status===429){window.__fsBo=Math.min((window.__fsBo||60000)*2,900000);window.__fsCool=Date.now()+window.__fsBo}else if(r.ok){window.__fsBo=0}
    if(r.status===404){useAdd('r',1);return null}
-   if(!r.ok){var e=new Error('http '+r.status);e.code=(r.status===401||r.status===403)?'invalid_argument':(r.status===429?'resource_exhausted':'unavailable');throw e}
+   if(!r.ok){var __bt='';try{__bt=(await r.text()).slice(0,160)}catch(x){}var e=new Error('http '+r.status);e.code=(r.status===401||r.status===403)?'invalid_argument':(r.status===429?'resource_exhausted':'unavailable');try{window.__syncDiag.err={w:method+' '+String(url).replace(base,''),s:r.status,b:__bt,t:Date.now()}}catch(x){}throw e}
    var __j=await r.json();useAdd(method==='DELETE'?'x':(method==='PATCH'?'w':'r'),method==='POST'?Math.max(1,(__j||[]).length):1);return __j;
   }
   return {users:async function(){
@@ -400,16 +400,16 @@ function __v18(){
     set:async function(x){await call('PATCH',u,enc(x))},
     delete:async function(){await call('DELETE',u)}}},
    onSnapshot:function(next,err){
-    var maxT=0,first=true,dead=false,idle=0,tm=null,inflight=false,rfast=false;try{var __sv=parseInt(L.getItem('__syncsince')||'0',10);if(__sv>Date.now()+300000){maxT=0;first=true;L.removeItem('__syncsince')}else if(__sv>0&&Object.keys(st.meta||{}).length>0){maxT=__sv;first=false}}catch(e){}
+    var maxT=0,first=true,dead=false,idle=0,tm=null,inflight=false,rfast=false,rmore=false;try{var __sv=parseInt(L.getItem('__syncsince')||'0',10);if(__sv>Date.now()+300000){maxT=0;first=true;L.removeItem('__syncsince')}else if(__sv>0&&Object.keys(st.meta||{}).length>0){maxT=__sv;first=false}}catch(e){}
     async function poll(){
      if(dead||inflight)return;inflight=true;clearTimeout(tm);
      try{var since=first?0:Math.max(0,maxT-25000);
       var res=await call('POST',base+':runQuery',{structuredQuery:{from:[{collectionId:c}],where:{fieldFilter:{field:{fieldPath:'t'},op:'GREATER_THAN',value:{integerValue:String(since)}}},orderBy:[{field:{fieldPath:'t'},direction:'ASCENDING'}]}});
       try{var __rt=(res||[]).map(function(x){return x&&x.readTime}).filter(Boolean).pop();if(__rt){var __k2=Date.parse(__rt)-Date.now();if(!isNaN(__k2))window.__srvSkew=__k2}}catch(e){}var __pm=maxT;var docs=[];(res||[]).forEach(function(x){if(x.document){var o=dec(x.document);docs.push({id:x.document.name.split('/').pop(),exists:true,data:function(){return o}});if(o.t>maxT&&o.t<=Date.now()+(window.__srvSkew||0)+300000)maxT=o.t}});
       if(maxT>__pm)idle=0;else idle++;var wasFirst=first;first=false;
-      var __sn={docs:docs,size:docs.length,bad:0,metadata:{fromCache:false},docChanges:function(){return docs.map(function(d){return {type:'added',doc:d}})}};await next(__sn);if(__sn.bad>0&&(st.pr=(st.pr||0)+1)<=6){maxT=__pm;idle=0;rfast=true}else{st.pr=0;try{if(maxT>0)L.setItem('__syncsince',String(maxT))}catch(e){}}
-     }catch(e){if(first&&err&&e.code!=='resource_exhausted'){err(e);dead=true;return}}
-     inflight=false;var __adm=document.body&&document.body.classList.contains('isadm');var __ms=document.hidden?300000:(__adm?(idle<20?3000:5000):(idle<5?30000:180000));try{if(useGet().r>=(__adm?35000:12000))__ms=Math.max(__ms,600000)}catch(e){}if(window.__fsCool&&Date.now()<window.__fsCool)__ms=Math.max(__ms,window.__fsCool-Date.now()+1000);if(rfast){__ms=Math.min(__ms,15000);rfast=false}tm=setTimeout(poll,__ms);
+      var __sn={docs:docs,size:docs.length,bad:0,metadata:{fromCache:false},docChanges:function(){return docs.map(function(d){return {type:'added',doc:d}})}};await next(__sn);if(__sn.bad>0&&(st.pr=(st.pr||0)+1)<=6){maxT=__pm;idle=0;rfast=true}else{st.pr=0;try{if(maxT>0)L.setItem('__syncsince',String(maxT))}catch(e){}}try{window.__syncDiag.pollOk++;window.__syncDiag.lastPoll={t:Date.now(),n:docs.length,bad:__sn.bad,since:since};if(maxT>__pm&&!rfast)rmore=true;if(st.mode==='error'&&st.errMsg==='انقطع الاتصال بقاعدة البيانات'){st.mode='sync';st.errMsg=null;paint()}}catch(x){}
+     }catch(e){try{window.__syncDiag.pollFail++;if(!window.__syncDiag.err||Date.now()-window.__syncDiag.err.t>2000)window.__syncDiag.err={w:'poll',s:String(e&&e.message),t:Date.now()}}catch(x){}if(first&&err&&e.code!=='resource_exhausted'){err(e)}}
+     inflight=false;var __adm=document.body&&document.body.classList.contains('isadm');var __ms=document.hidden?300000:(__adm?(idle<20?3000:5000):(idle<5?10000:45000));try{if(useGet().r>=(__adm?35000:12000))__ms=Math.max(__ms,600000)}catch(e){}if(window.__fsCool&&Date.now()<window.__fsCool)__ms=Math.max(__ms,window.__fsCool-Date.now()+1000);if(rfast){__ms=Math.min(__ms,15000);rfast=false}if(rmore){rmore=false;try{if(useGet().r<12000)__ms=Math.min(__ms,700)}catch(x){}}tm=setTimeout(poll,__ms);
     }
     document.addEventListener('visibilitychange',function(){if(!document.hidden&&!dead){idle=0;poll()}});
     poll();return function(){dead=true};
@@ -427,6 +427,7 @@ function __v18(){
   finally{res(out)}
  })})};
  function startSync(){
+  try{var __pn0=document.getElementById('syncPanel');if(__pn0&&!document.getElementById('syncDiagB')){var __db=document.createElement('button');__db.id='syncDiagB';__db.textContent='🩺 فحص المزامنة';__db.onclick=function(){var D=window.__syncDiag||{};function fin(l){l=l||[];var f=l.filter(function(x){return x.k==='dfreq'}),up=f.filter(function(x){return st.meta[x.sk]>0}).length;var e=D.err?(D.err.w+' | '+D.err.s+(D.err.b?' | '+D.err.b:'')+' | '+new Date(D.err.t).toLocaleTimeString('ar-EG')):'لا يوجد';var lp=D.lastPoll?(D.lastPoll.n+' مستند، فشل '+D.lastPoll.bad+'، '+new Date(D.lastPoll.t).toLocaleTimeString('ar-EG')):'لسه';var r=['الرابط: '+String(window.__CF||'FB').replace(/^https?:\/\//,'').slice(0,60),'الحالة: '+st.mode+' | جاهز: '+st.ready+' | كتابة: '+st.canWrite,'سجلات الأرشيف على الجهاز: '+l.length+' (ترددات '+f.length+')','الترددات المرفوعة: '+up+' | لسه مارفعتش: '+(f.length-up),'رفع ناجح: '+(D.pushOk||0)+' | فاشل: '+(D.pushFail||0),'سحب ناجح: '+(D.pollOk||0)+' | فاشل: '+(D.pollFail||0),'آخر سحب: '+lp,'آخر خطأ: '+e].join('\n');try{navigator.clipboard.writeText(r)}catch(x){}alert(r)}if(window.arAll)window.arAll(fin);else fin([])};__pn0.appendChild(__db)}}catch(e){}
   try{var __pn=document.getElementById('syncPanel');if(__pn&&!document.getElementById('syncRepull')){var __rb=document.createElement('button');__rb.id='syncRepull';__rb.textContent='🔁 سحب كل البيانات من جديد';__rb.onclick=function(){try{L.removeItem('__syncsince');L.removeItem('__syncmeta')}catch(e){}location.reload()};__pn.appendChild(__rb)}}catch(e){}
   st.mode='sync';setTimeout(finishFirst,10000);
   var __hasU=false;try{for(var __i=0;__i<L.length;__i++){if(String(L.key(__i)).indexOf('um:u:')===0){__hasU=true;break}}}catch(e){}
