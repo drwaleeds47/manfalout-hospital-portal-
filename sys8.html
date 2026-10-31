@@ -6,6 +6,7 @@
 <script>
 /* إعدادات Firebase لمشروع waleed-sayed */
 window.__FB={apiKey:"AIzaSyC9VAAO09LClT8QDVg10LCj0zD_GQ0ADHI",projectId:"waleed-sayed",email:"drwaleeds45@gmail.com"};
+window.__CF="https://manfalout-governance-committee.drwaleeds45.workers.dev/api/sync";/* المزامنة على Cloudflare D1 — لو عاوز ترجع Firestore خلّيها "" */
 </script><style id="authlock-css">html.authlock body>*:not([data-ui]){visibility:hidden!important}html.authlock body{background:#14213d!important}</style><script>try{if(!localStorage.getItem("__syncauth"))document.documentElement.classList.add("authlock")}catch(e){}</script><script>/* ===== طبقة المزامنة والتوافق مع الموبايل والويب ===== */
 function __shimA(w){
  if(w.__shim)return;w.__shim=1;
@@ -182,6 +183,7 @@ function __v18(){
 (function(){
  var EX=/^(portal:last|__sync|um:u:)/,META='__syncmeta',L=null;
  try{L=window.localStorage}catch(e){}
+ try{if(window.__CF&&L&&L.getItem('__syncbk')!=='cf1'){['__syncmeta','__synchash','__synccn','__syncsince','__syncbase','__syncarpm'].forEach(function(k){L.removeItem(k)});L.setItem('__syncbk','cf1')}}catch(e){}
  if(!L)return;
  var st={db:null,dl:null,ready:false,canWrite:true,meta:{},hs:{},seen:{},firstApplied:false,busy:false,mode:'init',last:0,banner:false,lp:{},cn:{},paused:false};try{st.cn=JSON.parse(L.getItem('__synccn')||'{}')||{}}catch(e){st.cn={}}
  try{st.meta=JSON.parse(L.getItem(META)||'{}')}catch(e){}
@@ -379,7 +381,7 @@ function __v18(){
   f.onsubmit=async function(ev){ev.preventDefault();er.style.display='';er.style.background='#ffe082';er.textContent='جاري التحقق…';try{await fbSignIn(cfg,i.value,await __nameEmail((o.querySelector('#fbEm')||{}).value));o.remove();res()}catch(e){er.style.display='';er.style.background='#ff8a80';er.textContent=/USER_DISABLED/i.test(e.message)?'الحساب موقوف':(/PASSWORD|INVALID|EMAIL/i.test(e.message)?'اسم المستخدم أو كلمة السر غلط':'تعذر الاتصال، جرّب تاني')}}
  })}
  function fbAdapter(cfg){
-  var base='https://firestore.googleapis.com/v1/projects/'+cfg.projectId+'/databases/(default)/documents';
+  var base=window.__CF?String(window.__CF).replace(/\/+$/,'')+'/documents':'https://firestore.googleapis.com/v1/projects/'+cfg.projectId+'/databases/(default)/documents';
   function enc(o){var f={};Object.keys(o).forEach(function(k){var v=o[k];f[k]=typeof v==='string'?{stringValue:v}:typeof v==='boolean'?{booleanValue:v}:{integerValue:String(v)}});return {fields:f}}
   function dec(d){var o={};Object.keys(d.fields||{}).forEach(function(k){var v=d.fields[k];o[k]=('stringValue' in v)?v.stringValue:('booleanValue' in v)?v.booleanValue:('integerValue' in v)?Number(v.integerValue):null});return o}
   async function call(method,url,body){
