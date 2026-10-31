@@ -183,7 +183,8 @@ function __v18(){
 (function(){
  var EX=/^(portal:last|__sync|um:u:)/,META='__syncmeta',L=null;
  try{L=window.localStorage}catch(e){}
- try{if(window.__CF&&L&&L.getItem('__syncbk')!=='cf1'){['__syncmeta','__synchash','__synccn','__syncsince','__syncbase','__syncarpm'].forEach(function(k){L.removeItem(k)});L.setItem('__syncbk','cf1')}}catch(e){}
+ try{if(window.__CF&&L&&L.getItem('__syncfix2')!=='1'){L.removeItem('__syncsince');L.removeItem('__syncmeta');L.setItem('__syncfix2','1')}}catch(e){}
+  try{if(window.__CF&&L&&L.getItem('__syncbk')!=='cf1'){['__syncmeta','__synchash','__synccn','__syncsince','__syncbase','__syncarpm'].forEach(function(k){L.removeItem(k)});L.setItem('__syncbk','cf1')}}catch(e){}
  if(!L)return;
  var st={db:null,dl:null,ready:false,canWrite:true,meta:{},hs:{},seen:{},firstApplied:false,busy:false,mode:'init',last:0,banner:false,lp:{},cn:{},paused:false};try{st.cn=JSON.parse(L.getItem('__synccn')||'{}')||{}}catch(e){st.cn={}}
  try{st.meta=JSON.parse(L.getItem(META)||'{}')}catch(e){}
@@ -220,7 +221,7 @@ function __v18(){
   else if(st.mode==='init'){t='☁ جاري الاتصال…';m='بنحمّل البيانات المحفوظة.'}
   else if(!st.canWrite){t='🔒 قراءة فقط';c='warn';m='معاك صلاحية عرض بس. التعديلات مش هتتحفظ للباقي. اطلب صلاحية "مساهم".'}
   else if(st.mode==='error'){t='☁ جاري المحاولة…';c='warn';m=st.errMsg||'حصل خطأ في المزامنة. هنحاول تاني تلقائي.'}
-  else{t='☁ متزامن'+(window.__CF?' · CF':' · FB');c='ok';m='كل التعديلات بتتحفظ تلقائي وتظهر على أي جهاز.'+(st.last?' آخر حفظ: '+new Date(st.last).toLocaleTimeString('ar-EG'):'')}
+  else{t='☁ متزامن'+(window.__CF?' · CF2':' · FB');c='ok';m='كل التعديلات بتتحفظ تلقائي وتظهر على أي جهاز.'+(st.last?' آخر حفظ: '+new Date(st.last).toLocaleTimeString('ar-EG'):'')}
   pill.textContent=t;pill.className=c;var el=document.getElementById('syncMsg');if(el)el.textContent=msgOverride||m;
   var r=document.getElementById('syncRefresh');if(r)r.hidden=!st.banner;
  }
@@ -271,9 +272,9 @@ function __v18(){
   if(rt<=(st.meta[k]||0))return;if(d.del)delete st.cn[k];else if(typeof d.n==='number')st.cn[k]=d.n;
   if(d.del){if(k.indexOf('ar:')===0){try{if(window.__arDelIn)await window.__arDelIn(k)}catch(e){}st.meta[k]=rt;saveMeta();return}try{L.removeItem(k)}catch(e){}delete st.hs[k];delete st.seen[k];st.meta[k]=rt;saveMeta();applied();return}
   var id=hash(k),parts=[];
-  if(typeof d.v==='string'&&d.n===1){parts=[d.v]}else for(var i=0;i<(d.n||0);i++){var s=await st.db.collection('lsc').doc(id+'_'+i).get();var sd=s.exists&&s.data();if(!sd||sd.t!==rt)return;parts.push(sd.d)}
+  if(typeof d.v==='string'&&d.n===1){parts=[d.v]}else for(var i=0;i<(d.n||0);i++){var s=await st.db.collection('lsc').doc(id+'_'+i).get();var sd=s.exists&&s.data();if(!sd||sd.t!==rt){st.rf=(st.rf||0)+1;return}parts.push(sd.d)}
   var v=parts.join('');
-  if(k.indexOf('ar:')===0){try{if(window.__arIn)await window.__arIn(k,v)}catch(e){return}st.meta[k]=rt;saveMeta();return}
+  if(k.indexOf('ar:')===0){try{if(window.__arIn)await window.__arIn(k,v)}catch(e){st.rf=(st.rf||0)+1;return}st.meta[k]=rt;saveMeta();return}
   var __rv=v;try{var __cur=L.getItem(k),__bs=__base[k];if(__cur!==null&&__bs!==undefined&&__cur!==__bs&&__cur!==v){var __m=__merge3(__bs,__cur,v);if(__m!==null&&__m!==v)v=__m}}catch(e){v=__rv}
   try{L.setItem(k,v)}catch(e){st.mode='error';st.errMsg='مساحة التخزين على الجهاز ممتلئة';paint();return}
   __base[k]=__rv;__saveBase();st.hs[k]=hash(__rv);st.seen[k]=__rv;st.meta[k]=rt;saveMeta();applied();
@@ -399,16 +400,16 @@ function __v18(){
     set:async function(x){await call('PATCH',u,enc(x))},
     delete:async function(){await call('DELETE',u)}}},
    onSnapshot:function(next,err){
-    var maxT=0,first=true,dead=false,idle=0,tm=null,inflight=false;try{var __sv=parseInt(L.getItem('__syncsince')||'0',10);if(__sv>Date.now()+300000){maxT=0;first=true;L.removeItem('__syncsince')}else if(__sv>0&&Object.keys(st.meta||{}).length>0){maxT=__sv;first=false}}catch(e){}
+    var maxT=0,first=true,dead=false,idle=0,tm=null,inflight=false,rfast=false;try{var __sv=parseInt(L.getItem('__syncsince')||'0',10);if(__sv>Date.now()+300000){maxT=0;first=true;L.removeItem('__syncsince')}else if(__sv>0&&Object.keys(st.meta||{}).length>0){maxT=__sv;first=false}}catch(e){}
     async function poll(){
      if(dead||inflight)return;inflight=true;clearTimeout(tm);
      try{var since=first?0:Math.max(0,maxT-25000);
       var res=await call('POST',base+':runQuery',{structuredQuery:{from:[{collectionId:c}],where:{fieldFilter:{field:{fieldPath:'t'},op:'GREATER_THAN',value:{integerValue:String(since)}}},orderBy:[{field:{fieldPath:'t'},direction:'ASCENDING'}]}});
       try{var __rt=(res||[]).map(function(x){return x&&x.readTime}).filter(Boolean).pop();if(__rt){var __k2=Date.parse(__rt)-Date.now();if(!isNaN(__k2))window.__srvSkew=__k2}}catch(e){}var __pm=maxT;var docs=[];(res||[]).forEach(function(x){if(x.document){var o=dec(x.document);docs.push({id:x.document.name.split('/').pop(),exists:true,data:function(){return o}});if(o.t>maxT&&o.t<=Date.now()+(window.__srvSkew||0)+300000)maxT=o.t}});
-      if(maxT>__pm)idle=0;else idle++;var wasFirst=first;first=false;try{if(maxT>0)L.setItem('__syncsince',String(maxT))}catch(e){}
-      next({docs:docs,size:docs.length,metadata:{fromCache:false},docChanges:function(){return docs.map(function(d){return {type:'added',doc:d}})}});
+      if(maxT>__pm)idle=0;else idle++;var wasFirst=first;first=false;
+      var __sn={docs:docs,size:docs.length,bad:0,metadata:{fromCache:false},docChanges:function(){return docs.map(function(d){return {type:'added',doc:d}})}};await next(__sn);if(__sn.bad>0&&(st.pr=(st.pr||0)+1)<=6){maxT=__pm;idle=0;rfast=true}else{st.pr=0;try{if(maxT>0)L.setItem('__syncsince',String(maxT))}catch(e){}}
      }catch(e){if(first&&err&&e.code!=='resource_exhausted'){err(e);dead=true;return}}
-     inflight=false;var __adm=document.body&&document.body.classList.contains('isadm');var __ms=document.hidden?300000:(__adm?(idle<20?3000:5000):(idle<5?30000:180000));try{if(useGet().r>=(__adm?35000:12000))__ms=Math.max(__ms,600000)}catch(e){}if(window.__fsCool&&Date.now()<window.__fsCool)__ms=Math.max(__ms,window.__fsCool-Date.now()+1000);tm=setTimeout(poll,__ms);
+     inflight=false;var __adm=document.body&&document.body.classList.contains('isadm');var __ms=document.hidden?300000:(__adm?(idle<20?3000:5000):(idle<5?30000:180000));try{if(useGet().r>=(__adm?35000:12000))__ms=Math.max(__ms,600000)}catch(e){}if(window.__fsCool&&Date.now()<window.__fsCool)__ms=Math.max(__ms,window.__fsCool-Date.now()+1000);if(rfast){__ms=Math.min(__ms,15000);rfast=false}tm=setTimeout(poll,__ms);
     }
     document.addEventListener('visibilitychange',function(){if(!document.hidden&&!dead){idle=0;poll()}});
     poll();return function(){dead=true};
@@ -426,11 +427,12 @@ function __v18(){
   finally{res(out)}
  })})};
  function startSync(){
+  try{var __pn=document.getElementById('syncPanel');if(__pn&&!document.getElementById('syncRepull')){var __rb=document.createElement('button');__rb.id='syncRepull';__rb.textContent='🔁 سحب كل البيانات من جديد';__rb.onclick=function(){try{L.removeItem('__syncsince');L.removeItem('__syncmeta')}catch(e){}location.reload()};__pn.appendChild(__rb)}}catch(e){}
   st.mode='sync';setTimeout(finishFirst,10000);
   var __hasU=false;try{for(var __i=0;__i<L.length;__i++){if(String(L.key(__i)).indexOf('um:u:')===0){__hasU=true;break}}}catch(e){}
   if(false&&st.db&&st.db.users&&!__hasU){(async function(){for(var a=0;a<4;a++){try{var ds=await st.db.users();for(var i=0;i<ds.length;i++)await remote(ds[i]);return}catch(e){await new Promise(function(z){setTimeout(z,4000)})}}})()}
-  st.db.collection('ls').onSnapshot(function(snap){enq(async function(){
-    var ch=snap.docChanges();for(var i=0;i<ch.length;i++){if(ch[i].type!=='removed')await remote(ch[i].doc)}
+  st.db.collection('ls').onSnapshot(function(snap){return enq(async function(){
+    var __rf0=st.rf||0;var ch=snap.docChanges();for(var i=0;i<ch.length;i++){if(ch[i].type!=='removed'){try{await remote(ch[i].doc)}catch(e){st.rf=(st.rf||0)+1}}}snap.bad=(st.rf||0)-__rf0;
     window.__arSnapOk=true;if(!st.ready&&!snap.metadata.fromCache)finishFirst()})},
    function(){st.mode='error';st.errMsg='انقطع الاتصال بقاعدة البيانات';paint()});
  }
