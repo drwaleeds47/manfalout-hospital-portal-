@@ -3769,6 +3769,12 @@ function ldgDiag(){var d=LD.diag||{z:[],h:0},h='';if(!isAdmin())return'';
  if(d.h)h+='<span id="ldgRsChip" style="background:#ffcc80;cursor:pointer" title="اضغط لاسترجاع المحذوف (للأدمن)" onclick="var b=document.getElementById(\'ldgRs\');if(b)b.click()">🙈 '+d.h+' سجل مخفي (محذوف من الدفتر) — ↩ اضغط هنا لاسترجاعها</span>';
  h+='<span style="background:#b3e5fc;cursor:pointer" onclick="window.__ldgScan&&window.__ldgScan()">🔎 فحص كل مستندات النوبتجيات</span>';
  return h}
+/* إصلاح: إظهار نوبتجية الاستقبال والطوارئ 8ص–8م (نوفمبر 2026) — تنظيف مرة واحدة لكل متصفح من قائمة المخفي */
+(function(){try{var F='ldg:fixEm8:v1';if(localStorage.getItem(F))return;
+ ['ldg:hid','ldg:hid:bk'].forEach(function(k){var a=[];try{a=JSON.parse(localStorage.getItem(k)||'[]')}catch(e){}
+  var b=a.filter(function(x){x=String(x);return !(x.indexOf('الأطباء البشري|الاستقبال والطوارئ|')===0&&/\/11\/2026\|نوبتجية$/.test(x))});
+  if(b.length!==a.length)localStorage.setItem(k,JSON.stringify(b))});
+ localStorage.setItem(F,'1')}catch(e){}})();
 function hidK(){var o=[];['ldg:hid','ldg:hid:bk'].forEach(function(k){try{JSON.parse(localStorage.getItem(k)||'[]').forEach(function(x){if(o.indexOf(x)<0)o.push(x)})}catch(e){}});return o}
 function setHid(a){var j=JSON.stringify(a);['ldg:hid','ldg:hid:bk'].forEach(function(k){try{localStorage.setItem(k,j)}catch(e){}})}
 function pbg(p){return p==='سهر مسائي'?'#ffcc80':p==='سهر'?'#d1c4e9':'#fff59d'}
