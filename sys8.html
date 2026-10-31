@@ -220,7 +220,7 @@ function __v18(){
   else if(st.mode==='init'){t='☁ جاري الاتصال…';m='بنحمّل البيانات المحفوظة.'}
   else if(!st.canWrite){t='🔒 قراءة فقط';c='warn';m='معاك صلاحية عرض بس. التعديلات مش هتتحفظ للباقي. اطلب صلاحية "مساهم".'}
   else if(st.mode==='error'){t='☁ جاري المحاولة…';c='warn';m=st.errMsg||'حصل خطأ في المزامنة. هنحاول تاني تلقائي.'}
-  else{t='☁ متزامن';c='ok';m='كل التعديلات بتتحفظ تلقائي وتظهر على أي جهاز.'+(st.last?' آخر حفظ: '+new Date(st.last).toLocaleTimeString('ar-EG'):'')}
+  else{t='☁ متزامن'+(window.__CF?' · CF':' · FB');c='ok';m='كل التعديلات بتتحفظ تلقائي وتظهر على أي جهاز.'+(st.last?' آخر حفظ: '+new Date(st.last).toLocaleTimeString('ar-EG'):'')}
   pill.textContent=t;pill.className=c;var el=document.getElementById('syncMsg');if(el)el.textContent=msgOverride||m;
   var r=document.getElementById('syncRefresh');if(r)r.hidden=!st.banner;
  }
