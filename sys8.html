@@ -4961,7 +4961,8 @@ window.addEventListener('resize',function(){var q=document.querySelectorAll(SEL)
   try{var snap=await DB.collection(COL).where(field,'==',val).get()}catch(e){throw wrap(e)}
   return snap.docs.map(function(d){return{id:d.id,data:fromSdk(d.data())}})}
  async function setDoc(id,obj){await ensure();try{await DB.collection(COL).doc(id).set(toSdk(obj))}catch(e){throw wrap(e)}}
- async function delDoc(id){await ensure();try{await DB.collection(COL).doc(id).delete()}catch(e){throw wrap(e)}}
+ async function patchType(id,t){await ensure();try{await DB.collection(COL).doc(id).update({type:t})}catch(e){throw wrap(e)}}
+  async function delDoc(id){await ensure();try{await DB.collection(COL).doc(id).delete()}catch(e){throw wrap(e)}}
  /* ---------- قراءة أرشيف سيستم 8 ---------- */
  function arAllP(){return new Promise(function(res,rej){if(typeof window.arAll!=='function')return rej(new Error('أرشيف سيستم 8 غير جاهز'));try{window.arAll(function(l){res(l||[])})}catch(e){rej(e)}})}
  function parseS8(e){
@@ -4996,28 +4997,29 @@ window.addEventListener('resize',function(){var q=document.querySelectorAll(SEL)
   var R={add:0,upd:0,del:0,dup:0,old:0,mod:0,fail:0,tot:0};
   try{
    var all=await arAllP(),want={};
-   all.filter(function(e){return e&&e.k==='shifts'&&e.h&&e.s!=='rj'}).forEach(function(e){var gs=null;try{gs=parseS8(e)}catch(x){}if(!gs){R.old++;return}gs.forEach(function(g){want[g.id]=g})});
+   all.filter(function(e){return e&&e.k==='shifts'&&e.h&&e.s!=='rj'}).forEach(function(e){var __d=/الفئة<b[^>]*>المدراء المناوبين</.test(e.h);if(__d)R.dmSrc=(R.dmSrc||0)+1;var gs=null;try{gs=parseS8(e)}catch(x){}if(!gs){R.old++;if(__d)R.dmOld=(R.dmOld||0)+1;return}gs.forEach(function(g){want[g.id]=g})});
    var sig=h(Object.keys(want).sort().map(function(i){return i+':'+want[i].srcHash+':'+(want[i].hf?1:0)}).join('|'));if(!manual&&S.sig===sig&&S.at&&Date.now()-S.at<900000){S.busy=false;paint();return}
     var ex={};(await queryEq('sourceSystem',SRC)).forEach(function(x){ex[x.id]=x.data});
-   var cache={},now=new Date().toISOString();
+   var cache={},now=new Date().toISOString();R.dmL=[];function isDm(g){return /الفئة<b[^>]*>المدراء المناوبين</.test((g.e&&g.e.h)||'')}function dmN(g,c,s){if(isDm(g))R.dmL.push(g.category+' — '+g.month+'/'+g.year+' — '+g.shiftType+' ('+g.rows.length+' صف): '+s+(c&&c.type?' [نوع: '+c.type+']':''))}
    for(var id in want){
     var g=want[id],cur=ex[id];R.tot++;
     try{
      var isHf=!!g.hf;
      if(cur){
-      if(cur.status==='rejected'){R.rej=(R.rej||0)+1;continue} /* اترفض في سيستم 3 — منلمسوش */
+      if(cur.status==='rejected'){R.rej=(R.rej||0)+1;dmN(g,cur,'مرفوض في سيستم 3');continue}
+      if(cur.sourceSystem===SRC&&isDm(g)&&cur.type&&cur.type!==g.type){await patchType(id,g.type);R.upd++;dmN(g,cur,'اتصحّح نوع الجدول إلى '+g.type);continue} /* اترفض في سيستم 3 — منلمسوش */
       if(cur.status==='approved'&&cur.s8st!=='hf'&&!isHf){ /* اتعتمد من سيستم 3 → نعتمده في أرشيف سيستم 8 */
-       if(typeof window.arMove==='function'&&g.e){window.arMove(g.e,'hf');R.mv=(R.mv||0)+1}
+       if(typeof window.arMove==='function'&&g.e){window.arMove(g.e,'hf');R.mv=(R.mv||0)+1}dmN(g,cur,'اتعتمد من سيستم 3');
        continue}
-      if(cur.s8src===g.srcHash&&((cur.s8st==='hf')===isHf))continue; /* محدّث */
+      if(cur.s8src===g.srcHash&&((cur.s8st==='hf')===isHf)){dmN(g,cur,'موجود ومحدّث');continue} /* محدّث */
      }
-     if(cur&&h(JSON.stringify(cur.data||[]))!==cur.s8hash){R.mod++;continue} /* اتعدّل في سيستم 3 — منلمسوش */
+     if(cur&&h(JSON.stringify(cur.data||[]))!==cur.s8hash){R.mod++;dmN(g,cur,'معدّل في سيستم 3 (متلمسّش)');continue} /* اتعدّل في سيستم 3 — منلمسوش */
      var nat=await nativeKeys(g.category,g,cache),rows=g.rows.filter(function(r){return !nat[r.day+'|'+norm(r.staff)]});
-     if(!rows.length){R.dup++;if(cur){await delDoc(id)}continue}
+     if(!rows.length){R.dup++;dmN(g,cur,'مكرر (موجود في سيستم 3)');if(cur){await delDoc(id)}continue}
      var doc={type:g.type,category:g.category,shiftType:g.shiftType,month:g.month,year:g.year,username:g.by||S.name,dept:'',data:rows,status:isHf?'approved':'pending_final',s8st:isHf?'hf':'in',sourceSystem:SRC,s8link:true,s8sk:g.sk,s8src:g.srcHash,s8hash:h(JSON.stringify(rows)),submittedBySys8At:{__ts:now},createdAt:(cur&&cur.createdAt)||{__ts:now}};
      if(isHf){if(cur&&cur.status==='approved'&&cur.finalApprovedBy){doc.finalApprovedBy=cur.finalApprovedBy;doc.approvedBy=cur.approvedBy||cur.finalApprovedBy;if(cur.finalApprovedAt)doc.finalApprovedAt=cur.finalApprovedAt}else{doc.finalApprovedBy=S.name;doc.approvedBy=S.name;doc.finalApprovedAt={__ts:now}}}
      await setDoc(id,doc);
-     if(cur)R.upd++;else R.add++;
+     if(cur)R.upd++;else R.add++;dmN(g,cur,cur?'اتحدّث':'اتضاف');
     }catch(e){R.fail++;S.err=(e&&e.message)||String(e);if(e&&(e.status===401||e.status===403)){throw e}}}
    for(var xid in ex){if(want[xid])continue;var c=ex[xid];
     if(h(JSON.stringify(c.data||[]))!==c.s8hash){R.mod++;continue}
@@ -5053,10 +5055,11 @@ window.addEventListener('resize',function(){var q=document.querySelectorAll(SEL)
   var b=$('s3bBtn');if(!b)return;
   var i=b.querySelector('i');i.className=S.busy?'wk':(S.err?'er':(S.tok?'ok':''));
   var bx=$('s3bBox');if(!bx||!bx.classList.contains('on'))return;
-  var hs='<div class="c"><h3>🔗 ربط النوبتجيات بسيستم 3 و7</h3><p>أي نوبتجيات بتتضاف في سيستم 8 وتتعتمد (تروح غرفة الحفظ) بتتكتب في قاعدة سيستم 3 بحالة «بانتظار الاعتماد النهائي»، فتظهر في سيستم 3 تحت «طلبات قيد الموافقة ← نوبتجيات»، وبعد اعتمادك هناك تدخل الدفاتر وسيستم 7 بيسحبها بالاتصال المباشر بتاعه. لو رجّعت الاعتماد أو حذفت الأرشيف هنا، الجدول بيتشال من سيستم 3. الباسورد مش بيتحفظ.</p>';
+  var hs='<div class="c"><h3>🔗 ربط النوبتجيات بسيستم 3 و7 <small>· v-DM</small></h3><p>أي نوبتجيات بتتضاف في سيستم 8 وتتعتمد (تروح غرفة الحفظ) بتتكتب في قاعدة سيستم 3 بحالة «بانتظار الاعتماد النهائي»، فتظهر في سيستم 3 تحت «طلبات قيد الموافقة ← نوبتجيات»، وبعد اعتمادك هناك تدخل الدفاتر وسيستم 7 بيسحبها بالاتصال المباشر بتاعه. لو رجّعت الاعتماد أو حذفت الأرشيف هنا، الجدول بيتشال من سيستم 3. الباسورد مش بيتحفظ.</p>';
   if(!S.tok){hs+='<label>كود الموظف (حساب الأدمن في نظام النوبتجيات)</label><input id="s3bC" inputmode="numeric" autocomplete="off" value="'+(S.code||'').replace(/"/g,'')+'"><label>كلمة المرور</label><input id="s3bP" type="password" autocomplete="off"><div><button class="pri" id="s3bGo">دخول وربط</button><button class="sec" id="s3bX">إغلاق</button></div>'}
   else{hs+='<div class="st">الحالة: '+(S.busy?'⏳ جارٍ المزامنة…':'🟢 متصل بسيستم 3 — المزامنة تلقائية كل ثواني بعد أي اعتماد')+(S.at?'<br>آخر مزامنة: '+new Date(S.at).toLocaleTimeString('ar-EG'):'')+'</div>';
    if(S.last)hs+='<div class="st">'+summary(S.last).replace('✔ تمت المزامنة — ','')+'</div>';
+    if(S.last&&S.last.dmL)hs+='<div class="st">👔 المدراء المناوبين — في الأرشيف: '+(S.last.dmSrc||0)+(S.last.dmOld?' (فشلت قراءة '+S.last.dmOld+')':'')+' ← جداول: '+S.last.dmL.length+(S.last.dmL.length?'<br>'+S.last.dmL.join('<br>'):'')+'</div>';
    hs+='<div><button class="pri" id="s3bNow"'+(S.busy?' disabled':'')+'>🔄 مزامنة الآن</button><button class="dng" id="s3bOut">قطع الاتصال</button><button class="sec" id="s3bX">إغلاق</button></div>'}
   if(S.err)hs+='<div class="st er">'+String(S.err).replace(/</g,'&lt;')+'</div>';
   bx.innerHTML=hs+'</div>';
