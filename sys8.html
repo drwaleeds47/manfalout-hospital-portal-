@@ -1,5 +1,18 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><script id="perf_mo">
+<html lang="ar" dir="rtl"><head><script id="perf_iv">
+/* تخفيف الـpolling: على الموبايل لا تقل أي مؤقت عن 1.5 ثانية، وتتوقف الاستدعاءات والصفحة مخفية */
+(function(){
+ if(window.__perfIV)return;window.__perfIV=1;
+ var touch=false;try{touch=matchMedia('(pointer:coarse)').matches||/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)}catch(e){}
+ var SI=window.setInterval;
+ window.setInterval=function(fn,ms){
+  var a=Array.prototype.slice.call(arguments,2);
+  if(typeof fn!=='function')return SI.apply(window,arguments);
+  var d=+ms||0;if(touch&&d<1500)d=1500;
+  return SI.apply(window,[function(){if(document.hidden)return;return fn.apply(this,a)},d]);
+ };
+})();
+</script><script id="perf_mo">
 /* تخفيف المراقبات: أول تغيير يُنفَّذ فورًا، وأي تغييرات متتابعة خلال 250ms تتجمّع في استدعاء واحد */
 (function(){
  if(window.__perfMO||!window.MutationObserver)return;window.__perfMO=1;
@@ -307,9 +320,9 @@ function __v18(){
   __base[k]=__rv;__saveBase();st.hs[k]=hash(__rv);st.seen[k]=__rv;st.meta[k]=rt;saveMeta();applied();
  }
  var __lastIn=Date.now(),__autoT=null;
- ['keydown','input','pointerdown'].forEach(function(ev){document.addEventListener(ev,function(){__lastIn=Date.now()},true)});
+ ['keydown','input','pointerdown','touchstart','touchmove','scroll','click','wheel'].forEach(function(ev){document.addEventListener(ev,function(){__lastIn=Date.now()},{capture:true,passive:true})});
  function __editing(){try{var a=document.activeElement;function ed(x){return x&&(x.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(x.tagName))}if(ed(a))return true;if(a&&a.tagName==='IFRAME'){var d=a.contentDocument;if(d&&ed(d.activeElement))return true}}catch(e){}return false}
- function __autoApply(){if(__autoT)return;__autoT=setInterval(function(){if(!st.banner){clearInterval(__autoT);__autoT=null;return}if(st.busy||document.hidden===false&&(__editing()||Date.now()-__lastIn<20000))return;clearInterval(__autoT);__autoT=null;try{location.reload()}catch(e){}},5000)}
+ function __autoApply(){if(__autoT)return;__autoT=setInterval(function(){if(!st.banner){clearInterval(__autoT);__autoT=null;return}/* لا reload أبدًا والصفحة مخفية أو المستخدم داخل أي أيقونة أو لسه شغال: الأوتوماتيك بس من الرئيسية بعد 3 دقايق خمول */if(st.busy||document.hidden||location.hash||__editing()||Date.now()-__lastIn<180000)return;clearInterval(__autoT);__autoT=null;try{location.reload()}catch(e){}},15000)}
  function applied(){if(st.ready){st.banner=true;paint();__autoApply()}else st.firstApplied=true}
  function finishFirst(){
   if(st.ready)return;st.ready=true;st.mode='sync';
