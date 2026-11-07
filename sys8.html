@@ -6495,8 +6495,8 @@ st.textContent='#umEg .egbox{background:#fff;color:#000;border:3px solid #000;bo
 +'#umEg .egp{display:inline-block;border:2px solid #000;border-radius:999px;padding:1px 10px;font-weight:900}'
 +'#umEg .egm{text-align:center;font-weight:800;margin:6px 0}';
 D.head.appendChild(st);
-var S={items:[],kind:'all',status:'all',view:'pend',q:'',month:'',at:0,err:'',loading:false,inq:{name:'',busy:false,err:'',emp:null,gov:null}},host=null;
-var KINDS=[['all','الكل'],['leave','🏖️ إجازات'],['permit','⏰ أذونات'],['mission','🚗 خطوط سير'],['rest','🛏️ بدلات راحة']];
+var S={items:[],att:[],kind:'all',status:'all',view:'pend',q:'',month:'',at:0,err:'',loading:false,inq:{name:'',busy:false,err:'',emp:null,gov:null}},host=null;
+var KINDS=[['all','الكل'],['leave','🏖️ إجازات'],['permit','⏰ أذونات'],['mission','🚗 خطوط سير'],['rest','🛏️ بدلات راحة'],['attend','✍️ حضور المتعاقدين']];
 function errTxt(e){var m=String(e&&e.message||e||'');return /Failed to fetch|NetworkError|Load failed/i.test(m)?'تعذّر الاتصال بالكوبري — تأكد إن رابط الكوبري صحيح ومنشور بصلاحية «Anyone» (أو غيّر الرابط من زر ⚙ رابط الكوبري)':'تعذّر الاتصال بالكوبري: '+m}
 function kindOf(it){var c=String(it.category||''),t=String(it.type||'');
  if(/مبادل|نوبتج/.test(t)||c==='shift')return 'skip';
@@ -6511,8 +6511,9 @@ function stat(it){var s=String(it.status||'');
  if(s==='rejected')return['مرفوض','#ff8a80','rej'];
  if(s==='approved')return it.executed?['تم التنفيذ','#b6ff00','ok']:['معتمد — التنفيذ ينتظر مراجعة','#ffcc80','nx'];
  return['قيد الموافقة','#fff59d','pend']}
-function srcName(s){return({sys8:'سيستم 8',hr:'الموارد البشرية',shifts:'النوبتجيات',tardadat:'التردادات',emergency:'الخدمات العاجلة',governance:'الحوكمة',oversight_committee:'لجنة الإشراف','transformation_system':'التحول الرقمي'}[s])||s||'—'}
-function visible(){var q=S.q.trim();return S.items.filter(function(it){
+function srcName(s){return({sys8:'سيستم 8',hr:'الموارد البشرية',shifts:'النوبتجيات',tardadat:'التردادات',emergency:'الخدمات العاجلة',governance:'الحوكمة',oversight_committee:'لجنة الإشراف','transformation_system':'التحول الرقمي','attendance':'حضور المتعاقدين'}[s])||s||'—'}
+function ALL(){return S.items.concat(S.att||[]).sort(function(a,b){return String(b.submittedAt||b.date||'').localeCompare(String(a.submittedAt||a.date||''))})}
+function visible(){var q=S.q.trim();return ALL().filter(function(it){
  if(S.kind!=='all'&&it._k!==S.kind)return false;
  if(S.view==='pend'&&it._s[2]!=='pend')return false;
  if(S.view==='ok'&&it._s[2]!=='ok'&&it._s[2]!=='nx')return false;
@@ -6520,7 +6521,15 @@ function visible(){var q=S.q.trim();return S.items.filter(function(it){
  if(S.month&&dkey(it.date).slice(0,7)!==S.month)return false;
  if(q&&(String(it.name||'')+' '+String(it.type||'')+' '+String(it.dept||'')).indexOf(q)<0)return false;
  return true})}
-function load(force){if(S.loading)return;if(!force&&Date.now()-S.at<20000)return;
+function attItems(l){var o=[];(l||[]).forEach(function(e){if(!e||!e.h||(e.k!=='dcsign'&&e.k!=='dcatt'))return;var d;try{d=new DOMParser().parseFromString(e.h,'text/html')}catch(x){return}
+ var s=e.s==='hf'?['معتمد','#b6ff00','ok']:e.s==='rj'?['مرفوض','#ff8a80','rej']:['قيد الموافقة','#fff59d','pend'],it;
+ if(e.k==='dcsign'){var r=d.getElementById('cs-rec');if(!r||r.getAttribute('data-ok')!=='1')return;var dt=r.getAttribute('data-date')||'';if(!dt)return;
+  it={name:r.getAttribute('data-name')||'',type:'توقيع حضور متعاقد',date:dt,details:'القسم: '+(r.getAttribute('data-dept')||'—')+' - الوظيفة: '+(r.getAttribute('data-job')||'—')+' - العمل: '+(r.getAttribute('data-task')||'—')}}
+ else{var di=d.getElementById('ca-d'),d2=di?(di.getAttribute('value')||''):'';if(!d2)return;var n=0;[].forEach.call(d.querySelectorAll('tr[data-doc] td.st'),function(c){if(+(c.getAttribute('data-s')||0))n++});
+  it={name:'كشف الحضور اليومي',type:'كشف حضور متعاقدين',date:d2,details:'عدد الأطباء المسجلين: '+n}}
+ it.submittedAt=new Date(e.t||0).toISOString();it.sourceSystem='attendance';it._k='attend';it._s=s;it._e=e;it.decidedBy=(e.adminApproved&&e.adminApproved.by)||'';o.push(it)});return o}
+function loadAtt(){try{if(typeof window.arAll!=='function')return;window.arAll(function(l){S.att=attItems(l);draw()})}catch(x){}}
+function load(force){loadAtt();if(S.loading)return;if(!force&&Date.now()-S.at<20000)return;
  var B=window.__s8Bridge;if(!B){S.err='جسر الكوبري لم يُحمَّل';draw();return}
  S.loading=true;S.err='';draw();
  B.get({action:'getSharedRequests'}).then(function(j){
@@ -6529,6 +6538,9 @@ function load(force){if(S.loading)return;if(!force&&Date.now()-S.at<20000)return
   S.items=l;S.at=Date.now();S.loading=false;try{localStorage.setItem('s8_eg_cache',JSON.stringify(j.items||[]))}catch(x){}draw()
  }).catch(function(e){S.loading=false;S.err=errTxt(e);draw()})}
 function decide(it,status){var B=window.__s8Bridge;
+ if(it._k==='attend'){if(!confirm((status==='approved'?'اعتماد':'رفض')+' حضور المتعاقد «'+it.name+'» بتاريخ '+dkey(it.date)+'؟'))return;
+  try{window.arMove(it._e,status==='approved'?'hf':'rj')}catch(x){say('فشل: '+(x&&x.message||x));return}
+  setTimeout(loadAtt,700);setTimeout(loadAtt,1800);return}
  if(!confirm((status==='approved'?'اعتماد نهائي':'رفض')+' طلب «'+it.name+'» ('+it.type+')؟'+(status==='approved'?'\nسيتم تنفيذه (خصم الرصيد/زيادة العدّاد) في الكوبري.':'')))return;
  var by='';try{by=(window.__umApi&&window.__umApi.currentUser&&window.__umApi.currentUser().name)||''}catch(e){}
  B.post({action:'updateSharedRequestStatus',sharedId:it.sharedId,status:status,decidedBy:by||'وليد سيد حسانين سيد',rejectReason:''}).then(function(j){
@@ -6572,7 +6584,7 @@ function drawInq(box){var q=S.inq;
  g.forEach(function(it,i){h+='<tr><td>'+(i+1)+'</td><td>'+esc(dkey(it.date))+'</td><td>'+esc(it.type)+'</td><td style="max-width:340px">'+esc(it.details)+'</td><td>'+esc(it.status)+'</td><td>'+esc(srcName(it.source))+'</td></tr>'});
  w.innerHTML=h+'</table>';box.appendChild(w)}
 function draw(){if(!host)return;host.innerHTML='';var B=window.__s8Bridge;
- var it=S.items,cnt={pend:0,ok:0,rej:0,nx:0};it.forEach(function(x){cnt[x._s[2]]++});
+ var it=ALL(),cnt={pend:0,ok:0,rej:0,nx:0};it.forEach(function(x){cnt[x._s[2]]++});
  var box=mk('div','egbox');
  var cards=mk('div','egs');
  [['pend','⏳ طلبات قيد الموافقة',cnt.pend,'#fff59d'],['ok','✅ طلبات معتمدة',cnt.ok+cnt.nx,'#b6ff00'],['rej','❌ طلبات مرفوضة',cnt.rej,'#ff8a80'],['inq','🔎 استعلام عن موظف','','#90caf9']].forEach(function(c){
@@ -6604,7 +6616,7 @@ function drawTable(){var w=D.getElementById('egTbl');if(!w)return;var v=visible(
  w.onclick=function(e){var b=e.target.closest&&e.target.closest('button[data-a],button[data-r]');if(!b)return;
   var i=b.getAttribute('data-a');var rj=false;if(i==null){i=b.getAttribute('data-r');rj=true}
   decide(v[+i],rj?'rejected':'approved')}}
-function hydrate(){if(S.items.length)return;try{var c=JSON.parse(localStorage.getItem('s8_eg_cache')||'[]');S.items=(c||[]).map(function(it){it._k=kindOf(it);it._s=stat(it);return it}).filter(function(it){return it._k!=='skip'});S.items.sort(function(a,b){return String(b.submittedAt||b.date||'').localeCompare(String(a.submittedAt||a.date||''))})}catch(x){}}
+function hydrate(){setTimeout(loadAtt,300);if(S.items.length)return;try{var c=JSON.parse(localStorage.getItem('s8_eg_cache')||'[]');S.items=(c||[]).map(function(it){it._k=kindOf(it);it._s=stat(it);return it}).filter(function(it){return it._k!=='skip'});S.items.sort(function(a,b){return String(b.submittedAt||b.date||'').localeCompare(String(a.submittedAt||a.date||''))})}catch(x){}}
 window.__s8EgBuild=function(){host=mk('div');host.id='egHost';hydrate();draw();return host};
 D.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('#umEgTile'))setTimeout(function(){load(false);draw()},60)},true);
 })();
@@ -7096,19 +7108,25 @@ function bkMain(FB){
   +'.bk-tr{flex:1 1 auto;background:#eceff1;border:1.5px solid #000;border-radius:6px;height:5mm;overflow:hidden;direction:rtl}.bk-f{height:100%}.bk-v{flex:0 0 11mm;font-weight:900;font-size:9.5pt;text-align:center}'
   +'.bk-e{text-align:center;font-weight:900;padding:4mm;border:2.5px dashed #000;border-radius:12px;margin:2mm 0}'
   +'.bk-t{width:100%;table-layout:auto;margin:2mm 0}.bk-t th{background:#c6ff1a!important;font-size:9pt!important;padding:1mm!important}.bk-t td{font-size:9pt!important;font-weight:700;padding:.5mm 1mm!important;height:auto!important}.bk-t td.l{text-align:right}'
-  +'.bk-f,.bk-t th,.bk-sum span,.bk-tr{-webkit-print-color-adjust:exact;print-color-adjust:exact}@media print{.bk-ctl{display:none}}';
+  +'.bk-f,.bk-t th,.bk-sum span,.bk-tr{-webkit-print-color-adjust:exact;print-color-adjust:exact}@media print{.bk-ctl,.bk-pd{display:none}}'
+  +'.bk-pd{border:2.5px solid #000;border-radius:12px;background:#fff3e0;padding:2mm;margin:2mm 0}.bk-pd0{text-align:center;font-weight:900;font-size:10pt;background:#e8f5e9}'
+  +'.bk-pdh{display:flex;justify-content:space-between;align-items:center;gap:6px;font-weight:900;font-size:10.5pt;margin-bottom:1mm}.bk-pl{max-height:70mm;overflow:auto}'
+  +'.bk-pr{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;border-top:1.5px dashed #000;padding:1mm 0}.bk-ps{flex:1 1 60%;font-size:9.5pt;font-weight:800;text-align:right}.bk-pb{display:flex;gap:4px}'
+  +'.bk-pd button{font:inherit;font-weight:900;font-size:9.5pt;border:3px solid #000;border-radius:999px;padding:2px 12px;background:#39ff14;box-shadow:2px 2px 0 #000;cursor:pointer}.bk-pd button.rj{background:#ff5fa8}';
   D.head.appendChild(st)}
- var REC=[],PEND=0,DOCS=FB;
+ var REC=[],PEND=0,DOCS=FB,PL=[];
+function isAdm(){try{var P=window.parent;return !!((P.__umApi&&P.__umApi.isAdmin&&P.__umApi.isAdmin())||P.document.body.classList.contains('isadm'))}catch(x){return false}}
+function lock(){try{var ck=$('bk-ap');if(!ck)return;if(!isAdm()){ck.checked=true;ck.disabled=true;if(ck.parentNode)ck.parentNode.title='الدفتر بيعرض السجلات اللي اتاخد فيها قرار من الأدمن (معتمد أو مرفوض)'}else ck.disabled=false}catch(x){}}
  try{var h=parent.F.dcatt.p.join(''),dd=new DOMParser().parseFromString(h,'text/html'),o=[];
   [].forEach.call(dd.querySelectorAll('tr[data-doc]'),function(r){var n=r.querySelector('td.nm'),p=r.querySelector('td.dp'),nm=n?n.textContent.trim():'';if(nm)o.push({n:nm,d:p?p.textContent.trim():''})});
   if(o.length)DOCS=o}catch(e){}
  function parseE(e,out){var d;try{d=new DOMParser().parseFromString(e.h||'','text/html')}catch(x){return}
   if(e.k==='dcsign'){var r=d.getElementById('cs-rec');if(!r||r.getAttribute('data-ok')!=='1')return;var dt=r.getAttribute('data-date');if(!dt)return;
-   out.push({d:dt,n:r.getAttribute('data-name')||'',dp:r.getAttribute('data-dept')||'',j:r.getAttribute('data-job')||'',w:r.getAttribute('data-task')||'',tm:r.getAttribute('data-time')||new Date(e.t||0).toISOString(),s:1,src:'توقيع',ap:e.s==='hf'});return}
+   out.push({d:dt,n:r.getAttribute('data-name')||'',dp:r.getAttribute('data-dept')||'',j:r.getAttribute('data-job')||'',w:r.getAttribute('data-task')||'',tm:r.getAttribute('data-time')||new Date(e.t||0).toISOString(),s:1,src:'توقيع',ap:e.s==='hf',rj:e.s==='rj'});return}
   if(e.k==='dcatt'){var di=d.getElementById('ca-d'),d2=di?(di.getAttribute('value')||''):'';if(!d2)return;
    [].forEach.call(d.querySelectorAll('tr[data-doc]'),function(r){var st=r.querySelector('td.st'),s=st?+(st.getAttribute('data-s')||0):0;if(!s)return;
     var n=r.querySelector('td.nm'),p=r.querySelector('td.dp'),j=r.querySelector('td.sp'),w=r.querySelector('td.wk select');
-    out.push({d:d2,n:n?n.textContent.trim():'',dp:p?p.textContent.trim():'',j:j?j.textContent.trim():'',w:w?(w.getAttribute('data-v')||''):'',tm:new Date(e.t||0).toISOString(),s:s,src:'كشف يومي',ap:e.s==='hf'})})}}
+    out.push({d:d2,n:n?n.textContent.trim():'',dp:p?p.textContent.trim():'',j:j?j.textContent.trim():'',w:w?(w.getAttribute('data-v')||''):'',tm:new Date(e.t||0).toISOString(),s:s,src:'كشف يومي',ap:e.s==='hf',rj:e.s==='rj'})})}}
  function opts(sel,items,ph,lab){var cur=sel.value;sel.innerHTML='';var o=D.createElement('option');o.value='';o.textContent=ph;sel.appendChild(o);
   items.forEach(function(x){var e=D.createElement('option');e.value=x;e.textContent=lab?lab(x):x;sel.appendChild(e)});if(cur&&items.indexOf(cur)>-1)sel.value=cur}
  function build(){
@@ -7116,8 +7134,8 @@ function bkMain(FB){
   opts($('bk-dy'),WD,'— كل الأيام —');
   opts($('bk-dp'),uniq(DOCS.map(function(x){return x.d}).concat(REC.map(function(r){return r.dp}))),'— كل الأقسام —');
   opts($('bk-n'),uniq(DOCS.map(function(x){return x.n}).concat(REC.map(function(r){return r.n}))),'— كل الأسماء —')}
- function filt(){var m=$('bk-m').value,dt=$('bk-d').value,dy=$('bk-dy').value,nm=$('bk-n').value,dp=$('bk-dp').value,apo=$('bk-ap').checked;
-  return REC.filter(function(r){if(apo&&!r.ap)return false;if(m&&r.d.slice(0,7)!==m)return false;if(dt&&r.d!==dt)return false;if(dy&&dayName(r.d)!==dy)return false;if(nm&&r.n!==nm)return false;if(dp&&r.dp!==dp)return false;return true})}
+ function filt(){var m=$('bk-m').value,dt=$('bk-d').value,dy=$('bk-dy').value,nm=$('bk-n').value,dp=$('bk-dp').value,apo=$('bk-ap').checked||!isAdm();
+  return REC.filter(function(r){if(apo&&!r.ap&&!r.rj)return false;if(m&&r.d.slice(0,7)!==m)return false;if(dt&&r.d!==dt)return false;if(dy&&dayName(r.d)!==dy)return false;if(nm&&r.n!==nm)return false;if(dp&&r.dp!==dp)return false;return true})}
  function bars(cap,items){var h='<div class="bk-cap">'+esc(cap)+'</div>';
   if(!items.length)return '<div class="bk-e">لا توجد بيانات للمقارنة</div>';
   var mx=Math.max.apply(null,items.map(function(x){return x[1]}))||1;
@@ -7137,28 +7155,42 @@ function bkMain(FB){
  function table(rows){var s=rows.slice().sort(function(a,b){return a.d<b.d?1:a.d>b.d?-1:(a.tm<b.tm?1:-1)}),LIM=400,h;
   if(!s.length){$('bk-tb').innerHTML='<div class="bk-e">لا توجد سجلات حضور مطابقة للاستعلام</div>';return}
   h='<table class="gd-tb fm-tb bk-t"><thead><tr><th>م</th><th>التاريخ</th><th>اليوم</th><th>وقت التوقيع</th><th>القسم</th><th>الاسم</th><th>الوظيفة</th><th>العمل المكلف به</th><th>الحالة</th><th>المصدر</th></tr></thead><tbody>';
-  s.slice(0,LIM).forEach(function(r,i){h+='<tr><td>'+(i+1)+'</td><td>'+fmtD(r.d)+'</td><td>'+dayName(r.d)+'</td><td>'+(r.src==='توقيع'?fmtT(r.tm):'—')+'</td><td class="l">'+esc(r.dp)+'</td><td class="l"><b>'+esc(r.n)+'</b></td><td class="l">'+esc(r.j)+'</td><td>'+esc(r.w||'—')+'</td><td><b>'+STX[r.s]+'</b></td><td>'+r.src+(r.ap?' ✔':' ⏳')+'</td></tr>'});
+  s.slice(0,LIM).forEach(function(r,i){h+='<tr'+(r.rj?' style="background:#ffcdd2"':'')+'><td>'+(i+1)+'</td><td>'+fmtD(r.d)+'</td><td>'+dayName(r.d)+'</td><td>'+(r.src==='توقيع'?fmtT(r.tm):'—')+'</td><td class="l">'+esc(r.dp)+'</td><td class="l"><b>'+esc(r.n)+'</b></td><td class="l">'+esc(r.j)+'</td><td>'+esc(r.w||'—')+'</td><td><b>'+STX[r.s]+'</b></td><td>'+r.src+(r.rj?' ❌ مرفوض':(r.ap?' ✔ معتمد':' ⏳'))+'</td></tr>'});
   h+='</tbody></table>';if(s.length>LIM)h+='<div class="bk-note">المعروض أول '+LIM+' سجل من '+s.length+' — ضيّق الاستعلام لعرض الباقي.</div>';
   $('bk-tb').innerHTML=h}
- function render(){var rows=filt(),pres=rows.filter(function(r){return r.s===1||r.s===6}),nm={},dy={},pdy={};
+ function render(){lock();var rows=filt(),pres=rows.filter(function(r){return (r.s===1||r.s===6)&&!r.rj}),nm={},dy={},pdy={};
   pres.forEach(function(r){nm[r.n]=1;dy[r.d]=1;pdy[r.n+'|'+r.d]=1});
-  $('bk-note').textContent=(PEND&&$('bk-ap').checked)?('⏳ '+PEND+' سجل بانتظار الاعتماد وغير ظاهر — ألغِ «المعتمد فقط» لإظهاره.'):'';
-  $('bk-sum').innerHTML='<span>عدد السجلات: '+rows.length+'</span><span>الأطباء الحاضرون: '+Object.keys(nm).length+'</span><span>عدد الأيام: '+Object.keys(dy).length+'</span><span>إجمالي أيام الحضور (طبيب/يوم): '+Object.keys(pdy).length+'</span>';
+  $('bk-note').textContent=(PEND&&($('bk-ap').checked||!isAdm()))?('⏳ '+PEND+' سجل بانتظار اعتماد الأدمن وغير ظاهر'+(isAdm()?' — اعتمدها من اللوحة أعلاه، أو ألغِ «المعتمد فقط» لمعاينتها.':'.')):'';
+  $('bk-sum').innerHTML='<span>عدد السجلات: '+rows.length+'</span>'+(rows.some(function(r){return r.rj})?'<span style="background:#ff8a80">❌ مرفوض: '+rows.filter(function(r){return r.rj}).length+'</span>':'')+'<span>الأطباء الحاضرون: '+Object.keys(nm).length+'</span><span>عدد الأيام: '+Object.keys(dy).length+'</span><span>إجمالي أيام الحضور (طبيب/يوم): '+Object.keys(pdy).length+'</span>';
   chart(pres);table(rows)}
  function load(){var P=window.parent;if(!P||!P.arAll){$('bk-note').textContent='تعذر قراءة الأرشيف من هنا';return}
-  P.arAll(function(l){REC=[];PEND=0;(l||[]).forEach(function(e){if(!e||e.s==='rj'||!e.h)return;if(e.k!=='dcsign'&&e.k!=='dcatt')return;var b=REC.length;parseE(e,REC);if(e.s!=='hf')PEND+=REC.length-b});build();render()})}
+  P.arAll(function(l){REC=[];PEND=0;PL=[];(l||[]).forEach(function(e){if(!e||!e.h)return;if(e.k!=='dcsign'&&e.k!=='dcatt')return;var b=REC.length;parseE(e,REC);if(e.s!=='hf'&&e.s!=='rj'){PEND+=REC.length-b;if(REC.length>b)PL.push({e:e,r:REC.slice(b)})}});PL.sort(function(x,y){return (y.e.t||0)-(x.e.t||0)});build();render();pend()})}
+function sumE(x){var e=x.e,r=x.r,a=r[0];if(e.k==='dcsign')return '✍️ توقيع حضور — <b>'+esc(a.n)+'</b> — '+esc(a.dp)+(a.j?' — '+esc(a.j):'')+(a.w?' — '+esc(a.w):'')+' — '+fmtD(a.d)+' ('+dayName(a.d)+') '+fmtT(a.tm);
+ var c={},p=[];r.forEach(function(y){c[y.s]=(c[y.s]||0)+1});[1,6,2,3,4,5].forEach(function(k){if(c[k])p.push(STX[k]+' '+c[k])});
+ return '📋 كشف يومي — '+fmtD(a.d)+' ('+dayName(a.d)+') — '+r.length+' طبيب ('+p.join('، ')+')'}
+function pend(){var b=$('bk-pend');if(!b)return;if(!isAdm()){b.innerHTML='';b.style.display='none';return}b.style.display='';
+ if(!PL.length){b.innerHTML='<div class="bk-pd bk-pd0">✔ مفيش سجلات حضور بانتظار اعتمادك</div>';return}
+ var h='<div class="bk-pd"><div class="bk-pdh"><b>⏳ بانتظار اعتماد الأدمن ('+PL.length+')</b><button type="button" data-a="all">✅ اعتماد الكل</button></div><div class="bk-pl">';
+ PL.forEach(function(x,i){h+='<div class="bk-pr"><span class="bk-ps">'+sumE(x)+(x.e.u?' • 👤 '+esc(x.e.u):'')+'</span><span class="bk-pb"><button type="button" data-a="ap" data-i="'+i+'">✅ اعتماد</button><button type="button" class="rj" data-a="rj" data-i="'+i+'">❌ رفض</button></span></div>'});
+ b.innerHTML=h+'</div></div>'}
+D.addEventListener('click',function(ev){var b=ev.target&&ev.target.closest?ev.target.closest('#bk-pend button[data-a]'):null;if(!b||!isAdm())return;var a=b.getAttribute('data-a'),P=window.parent;
+ if(a==='all'){if(!PL.length)return;if(!confirm('اعتماد كل سجلات الحضور ('+PL.length+') ونقلها لغرفة الحفظ؟'))return;var Q=PL.slice();Q.forEach(function(x,i){setTimeout(function(){try{P.arMove(x.e,'hf')}catch(z){}},i*90)});setTimeout(load,Q.length*90+900);return}
+ var x=PL[+b.getAttribute('data-i')];if(!x)return;var a0=x.r[0];
+ if(a==='ap'){if(!confirm('اعتماد حضور «'+a0.n+'» بتاريخ '+fmtD(a0.d)+'؟'))return;try{P.arMove(x.e,'hf')}catch(z){}}
+ else if(a==='rj'){if(!confirm('رفض سجل «'+a0.n+'» بتاريخ '+fmtD(a0.d)+'؟ هيتنقل للمرفوض ومش هيظهر في الدفتر.'))return;try{P.arMove(x.e,'rj')}catch(z){}}
+ setTimeout(load,700);setTimeout(load,1800)},true);
  ['bk-m','bk-d','bk-dy','bk-dp','bk-n','bk-ap','bk-cm'].forEach(function(i){var e=$(i);e.addEventListener('change',render);e.addEventListener('input',render)});
  D.addEventListener('click',function(e){var b=e.target&&e.target.closest?e.target.closest('button[id]'):null;if(!b)return;
   if(b.id==='bk-rs'){['bk-m','bk-d','bk-dy','bk-dp','bk-n'].forEach(function(i){$(i).value=''});render()}
   else if(b.id==='bk-rf')load();else if(b.id==='bk-pr')window.print()},true);
  window.__bkRefresh=load;
- build();render();load();
+ lock();build();render();load();
 }
 
 /* ---------- تعريف النموذجين ---------- */
 var SG='<div class="fm-sg" contenteditable="false"><div><div class="fm-sgt">توقيع الطبيب</div><div>&nbsp;</div></div><div><div class="fm-sgt">المسئول عن المتابعة</div><div>&nbsp;</div></div><div><div class="fm-sgt">رئيس لجنة الإشراف والحوكمة</div><div>د.وليد سيد حسانين</div></div><div><div class="fm-sgt">مدير المستشفى</div><div>د.أسامه عبد المعطي</div></div></div>';
 var SIGN='<div class="gd-ttl">توقيع حضور الطبيب المتعاقد</div>'
-+'<div class="fm-n" contenteditable="false" data-ui="1">اختار اليوم والتاريخ والقسم والاسم والوظيفة والعمل المكلف به من القوائم، وبعدها اضغط «✅ توقيع وحفظ». التوقيع بيتحفظ في الأرشيف (مجمع حضور وانصراف المتعاقدين) وبيظهر في دفتر الحضور بعد الاعتماد.</div>'
++'<div class="fm-n" contenteditable="false" data-ui="1">اختار اليوم والتاريخ والقسم والاسم والوظيفة والعمل المكلف به من القوائم، وبعدها اضغط «✅ توقيع وحفظ». التوقيع بيتحفظ في الأرشيف (مجمع حضور وانصراف المتعاقدين) وبيظهر في دفتر الحضور بعد القرار (اعتماد أو رفض).</div>'
 +'<table class="gd-tb fm-tb cs-t" id="cs-rec" data-ok="0" contenteditable="false"><tbody>'
 +'<tr><th>اليوم</th><td><select id="cs-day" class="cs-s"></select></td><th>التاريخ</th><td><input type="date" id="cs-date" class="cs-s"></td></tr>'
 +'<tr><th>القسم</th><td><select id="cs-dept" class="cs-s"></select></td><th>الاسم</th><td><select id="cs-name" class="cs-s"></select></td></tr>'
@@ -7168,8 +7200,8 @@ var SIGN='<div class="gd-ttl">توقيع حضور الطبيب المتعاقد<
 var BOOK='<div class="gd-ttl">دفتر حضور الأطباء المتعاقدين</div>'
 +'<div class="fm-n" contenteditable="false" data-ui="1">استعلم عن الحضور بالشهر أو التاريخ أو اليوم أو الاسم — بيظهر تفصيل الحضور ومقارنة بيانية. المصدر: توقيعات الحضور (وكشوف الحضور اليومية القديمة) المحفوظة في الأرشيف.</div>'
 +'<div class="bk-ctl" contenteditable="false" data-ui="1"><label>الشهر<select id="bk-m"></select></label><label>التاريخ<input type="date" id="bk-d"></label><label>اليوم<select id="bk-dy"></select></label><label>القسم<select id="bk-dp"></select></label><label>الاسم<select id="bk-n"></select></label>'
-+'<label class="bk-ck"><input type="checkbox" id="bk-ap" checked>المعتمد فقط</label><button type="button" id="bk-rs">↺ مسح الفلاتر</button><button type="button" id="bk-rf">🔄 تحديث</button><button type="button" id="bk-pr">🖨 طباعة</button></div>'
-+'<div class="bk-note" id="bk-note" contenteditable="false"></div><div class="bk-sum" id="bk-sum" contenteditable="false"></div>'
++'<label class="bk-ck"><input type="checkbox" id="bk-ap" checked>بعد القرار فقط (معتمد/مرفوض)</label><button type="button" id="bk-rs">↺ مسح الفلاتر</button><button type="button" id="bk-rf">🔄 تحديث</button><button type="button" id="bk-pr">🖨 طباعة</button></div>'
++'<div id="bk-pend" contenteditable="false" data-ui="1"></div><div class="bk-note" id="bk-note" contenteditable="false"></div><div class="bk-sum" id="bk-sum" contenteditable="false"></div>'
 +'<div class="fm-u" contenteditable="false">📊 المقارنة البيانية</div>'
 +'<div class="bk-ctl" contenteditable="false" data-ui="1"><label>قارن حسب<select id="bk-cm"><option value="day">الأيام</option><option value="doc">الأطباء</option><option value="dept">الأقسام</option><option value="month">الشهور</option><option value="task">العمل المكلف به</option></select></label></div>'
 +'<div id="bk-ch" contenteditable="false"></div>'
