@@ -230,7 +230,7 @@ function __v18(){
  try{st.meta=JSON.parse(L.getItem(META)||'{}')}catch(e){}
  try{st.hs=JSON.parse(L.getItem('__synchash')||'{}')}catch(e){}
  function saveMeta(){try{L.setItem(META,JSON.stringify(st.meta));L.setItem('__synchash',JSON.stringify(st.hs));L.setItem('__synccn',JSON.stringify(st.cn))}catch(e){}}
- var WLIM=10000,MINGAP_S=15000,MINGAP_L=60000;window.__syncDiag={err:null,pushOk:0,pushFail:0,pollOk:0,pollFail:0,lastPoll:null};
+ var WLIM=10000,MINGAP_S=3000,MINGAP_L=60000;window.__syncDiag={err:null,pushOk:0,pushFail:0,pollOk:0,pollFail:0,lastPoll:null};
  function today(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
  function useGet(){var u=null;try{u=JSON.parse(L.getItem('__syncuse')||'null')}catch(e){}if(!u||u.d!==today())u={d:today(),r:0,w:0,x:0,k:{}};if(!u.k)u.k={};return u}
  function useAdd(f,n){try{var u=useGet();u[f]=(u[f]||0)+n;L.setItem('__syncuse',JSON.stringify(u))}catch(e){}}
@@ -307,6 +307,8 @@ function __v18(){
   if(!((Array.isArray(b)&&Array.isArray(l)&&Array.isArray(r))||(__isO(b)&&__isO(l)&&__isO(r))))return null;
   return JSON.stringify(__mv(b,l,r))}
  window.__merge3=__merge3;
+ /* تفريغ مساحة: بيشيل من الجهاز بس نسخ pg: اللي متطابقة تمامًا مع نسخة السيرفر (آمنة، ومش بتتحذف من السيرفر ولا من باقي الأجهزة)، وبنفس منطق __freeSpace الموجود */
+ function __freeSynced(skip){var n=0;try{var ks=[];for(var i=0;i<L.length;i++){var kk=L.key(i);if(kk&&kk!==skip&&kk.indexOf('pg:')===0&&st.hs[kk]!==undefined&&st.hs[kk]===hash(L.getItem(kk)))ks.push(kk)}ks.forEach(function(kk){try{L.removeItem(kk);delete st.hs[kk];delete st.seen[kk];n++}catch(e){}})}catch(e){}return n}
  async function remote(doc){
   var d=doc.data();if(!d||typeof d.k!=='string'||EX.test(d.k))return;var k=d.k,rt=d.t||0;
   if(rt<=(st.meta[k]||0))return;if(d.del)delete st.cn[k];else if(typeof d.n==='number')st.cn[k]=d.n;
@@ -317,8 +319,8 @@ function __v18(){
   if(k.indexOf('ar:')===0){try{if(window.__arIn)await window.__arIn(k,v)}catch(e){st.rf=(st.rf||0)+1;return}st.meta[k]=rt;saveMeta();return}
   var __rv=v;try{var __cur=L.getItem(k),__bs=__base[k];if(__bs===undefined&&k==='fo_db'&&__cur&&__cur.charAt(0)==='{')__bs='{}';/* بيانات الترددات المحلية اللي عمرها ما اترفعت: ادمجها مع اللي في السيرفر بدل ما تتمسح */if(__cur!==null&&__bs!==undefined&&__cur!==__bs&&__cur!==v){var __m=__merge3(__bs,__cur,v);if(__m!==null&&__m!==v)v=__m}}catch(e){v=__rv}
   try{if(k==='inv:n'){var __lo=parseInt(L.getItem(k),10)||0,__ro=parseInt(v,10)||0;if(__lo>__ro)v=String(__lo)}}catch(e){}
-  try{L.setItem(k,v)}catch(e){st.mode='error';st.errMsg='مساحة التخزين على الجهاز ممتلئة';paint();return}
-  __base[k]=__rv;__saveBase();st.hs[k]=hash(__rv);st.seen[k]=__rv;st.meta[k]=rt;saveMeta();applied();
+  try{L.setItem(k,v)}catch(e){var __fn=__freeSynced(k),__ok2=false;if(__fn>0){try{L.setItem(k,v);__ok2=true}catch(e2){}}if(!__ok2){st.mode='error';st.errMsg='مساحة التخزين على الجهاز ممتلئة';paint();return}}if(st.mode==='error'&&st.errMsg==='مساحة التخزين على الجهاز ممتلئة'){st.mode='sync';st.errMsg=null}
+  __base[k]=__rv;__saveBase();st.hs[k]=hash(__rv);st.seen[k]=__rv;st.meta[k]=rt;saveMeta();applied();try{if(st.ready&&k!==SIGK&&document.body&&document.body.classList.contains('isadm')&&Date.now()-(window.__reqToastAt||0)>4000){window.__reqToastAt=Date.now();toast('📥 وصل طلب جديد')}}catch(e){}
  }
  var __lastIn=Date.now(),__autoT=null;
  ['keydown','input','pointerdown','touchstart','touchmove','scroll','click','wheel'].forEach(function(ev){document.addEventListener(ev,function(){__lastIn=Date.now()},{capture:true,passive:true})});
@@ -364,7 +366,7 @@ function __v18(){
   try{var todo=[],present={};
    for(var i=0;i<L.length;i++){var k=L.key(i);if(EX.test(k))continue;present[k]=1;var v=L.getItem(k);if(hash(v)!==st.hs[k]){if(st.seen[k]===v){if(force||!st.lp[k]||Date.now()-st.lp[k]>=(v.length>150000?MINGAP_L:MINGAP_S))todo.push([k,v])}else st.seen[k]=v}}
    Object.keys(st.hs).forEach(function(k){if(!present[k]&&!EX.test(k))todo.push([k,null])});
-   for(var j=0;j<todo.length&&st.canWrite;j++)await push(todo[j][0],todo[j][1]);
+   var __pn=0;for(var j=0;j<todo.length&&st.canWrite;j++){await push(todo[j][0],todo[j][1]);if(todo[j][0]!==SIGK)__pn++}if(__pn>0){try{await sigPut()}catch(e){}}/* إشارة فورية للأدمن بعد أي رفع */
   }catch(e){}finally{st.busy=false}
  }
  /* ---------- Firebase (REST) ---------- */
@@ -489,7 +491,7 @@ function __v18(){
          sb=false;
         }
        }
-       stm=setTimeout(tick,window.__wsLive?30000:(document.hidden?30000:3000));
+       stm=setTimeout(tick,window.__wsLive?8000:(document.hidden?30000:3000));
       }
       document.addEventListener('visibilitychange',function(){if(!document.hidden&&!dead){clearTimeout(stm);tick()}});
       stm=setTimeout(tick,4000);
@@ -510,7 +512,7 @@ function __v18(){
   finally{res(out)}
  })})};
  function startSync(){
-  try{var __pn0=document.getElementById('syncPanel');if(__pn0&&!document.getElementById('syncDiagB')){var __db=document.createElement('button');__db.id='syncDiagB';__db.textContent='🩺 فحص المزامنة';__db.onclick=function(){var D=window.__syncDiag||{};function fin(l){l=l||[];var f=l.filter(function(x){return x.k==='dfreq'}),up=f.filter(function(x){return st.meta[x.sk]>0}).length;var e=D.err?(D.err.w+' | '+D.err.s+(D.err.b?' | '+D.err.b:'')+' | '+new Date(D.err.t).toLocaleTimeString('ar-EG')):'لا يوجد';var lp=D.lastPoll?(D.lastPoll.n+' مستند، فشل '+D.lastPoll.bad+'، '+new Date(D.lastPoll.t).toLocaleTimeString('ar-EG')):'لسه';var r=['الرابط: '+String(window.__CF||'FB').replace(/^https?:\/\//,'').slice(0,60),'الحالة: '+st.mode+' | جاهز: '+st.ready+' | كتابة: '+st.canWrite,'سجلات الأرشيف على الجهاز: '+l.length+' (ترددات '+f.length+')','الترددات المرفوعة: '+up+' | لسه مارفعتش: '+(f.length-up),'رفع ناجح: '+(D.pushOk||0)+' | فاشل: '+(D.pushFail||0),'تقدم السحب: '+(D.prog?D.prog.i+'/'+D.prog.n:'-'),'سحب ناجح: '+(D.pollOk||0)+' | فاشل: '+(D.pollFail||0),'آخر سحب: '+lp,'آخر خطأ: '+e].join('\n');try{navigator.clipboard.writeText(r)}catch(x){}alert(r)}if(window.arAll)window.arAll(fin);else fin([])};__pn0.appendChild(__db)}}catch(e){}
+  try{var __pn0=document.getElementById('syncPanel');if(__pn0&&!document.getElementById('syncDiagB')){var __db=document.createElement('button');__db.id='syncDiagB';__db.textContent='🩺 فحص المزامنة';__db.onclick=function(){var D=window.__syncDiag||{};function fin(l){l=l||[];var f=l.filter(function(x){return x.k==='dfreq'}),up=f.filter(function(x){return st.meta[x.sk]>0}).length;var e=D.err?(D.err.w+' | '+D.err.s+(D.err.b?' | '+D.err.b:'')+' | '+new Date(D.err.t).toLocaleTimeString('ar-EG')):'لا يوجد';var lp=D.lastPoll?(D.lastPoll.n+' مستند، فشل '+D.lastPoll.bad+'، '+new Date(D.lastPoll.t).toLocaleTimeString('ar-EG')):'لسه';var r=['الرابط: '+String(window.__CF||'FB').replace(/^https?:\/\//,'').slice(0,60),'الحالة: '+st.mode+' | جاهز: '+st.ready+' | كتابة: '+st.canWrite,'سجلات الأرشيف على الجهاز: '+l.length+' (ترددات '+f.length+')','الترددات المرفوعة: '+up+' | لسه مارفعتش: '+(f.length-up),'رفع ناجح: '+(D.pushOk||0)+' | فاشل: '+(D.pushFail||0),'تقدم السحب: '+(D.prog?D.prog.i+'/'+D.prog.n:'-'),'سحب ناجح: '+(D.pollOk||0)+' | فاشل: '+(D.pollFail||0),'آخر سحب: '+lp,'آخر خطأ: '+e,'رسالة الحالة: '+(st.errMsg||'-'),'تخزين الجهاز: '+(function(){try{var tot=0,a=[];for(var i=0;i<L.length;i++){var kk=L.key(i),n=(kk.length+(L.getItem(kk)||'').length);tot+=n;a.push([kk,n])}a.sort(function(x,y){return y[1]-x[1]});var ok='ok';try{L.setItem('__wtest',new Array(200001).join('x'));L.removeItem('__wtest')}catch(z){ok='فشل (ممتلئ)'}return Math.round(tot/1024)+' ألف حرف | اختبار كتابة: '+ok+' | الأكبر: '+a.slice(0,4).map(function(x){return x[0].slice(0,18)+'='+Math.round(x[1]/1024)+'ك'}).join(', ')}catch(z){return 'تعذر'}})()].join('\n');try{navigator.clipboard.writeText(r)}catch(x){}alert(r)}if(window.arAll)window.arAll(fin);else fin([])};__pn0.appendChild(__db)}}catch(e){}
   try{var __pn=document.getElementById('syncPanel');if(__pn&&!document.getElementById('syncRepull')){var __rb=document.createElement('button');__rb.id='syncRepull';__rb.textContent='🔁 سحب كل البيانات من جديد';__rb.onclick=function(){try{L.removeItem('__syncsince');L.removeItem('__syncmeta')}catch(e){}location.reload()};__pn.appendChild(__rb)}}catch(e){}
   st.mode='sync';setTimeout(finishFirst,10000);
   var __hasU=false;try{for(var __i=0;__i<L.length;__i++){if(String(L.key(__i)).indexOf('um:u:')===0){__hasU=true;break}}}catch(e){}
@@ -3203,7 +3205,7 @@ window.__saveCur=function(k){
   inflight[e.sk]=1;
   enc(e).then(function(v){return (window.__arPushNow||window.__arPush)(e.sk,v)}).then(function(){delete inflight[e.sk];setPm(e.sk,e.mt||e.ap||0);try{if(window.__arSignal)window.__arSignal()}catch(x){}},function(){delete inflight[e.sk];if(n<12)__fqRT[e.sk]=setTimeout(function(){pushFq(e,n+1)},Math.min(1500*(n+1),15000))})
  }
- function pushE(e){if(e&&e.k==="dfreq"&&e.sk)return pushFq(e,0);if(!e.sk||inflight[e.sk]||!ready())return;inflight[e.sk]=1;
+ function pushE(e){if(e&&e.sk)return pushFq(e,0);if(!e.sk||inflight[e.sk]||!ready())return;inflight[e.sk]=1;
   enc(e).then(function(v){return window.__arPush(e.sk,v)}).then(function(){delete inflight[e.sk];setPm(e.sk,e.mt||e.ap||0)},function(){delete inflight[e.sk]})}
  function getPm(){try{return JSON.parse(L.getItem("__syncarpm")||"{}")}catch(x){return{}}}
  function setPm(k,v){try{var m=getPm();m[k]=v;L.setItem("__syncarpm",JSON.stringify(m))}catch(x){}}
@@ -10230,7 +10232,26 @@ function check(){
   say('📥 وصل تسجيل ترددات جديد من: '+Object.keys(who).join('، '));
   live();
  })}
-function arrived(){clearTimeout(chkT);chkT=setTimeout(check,250)}
+/* [مزامنة فورية] أي طلب/نموذج يرسله مستخدم (غير الترددات) يظهر عند الأدمن في الحال + تنبيه */
+var RK='s8p5:rq:seen';
+function rqGet(){try{var a=JSON.parse(localStorage.getItem(RK)||'null');return Array.isArray(a)?a:null}catch(e){return null}}
+function rqSet(a){try{localStorage.setItem(RK,JSON.stringify(a.slice(-4000)))}catch(e){}}
+function rqOpen(l){return (l||[]).filter(function(e){return e&&e.sk&&e.k!=='dfreq'&&e.s!=='hf'&&e.s!=='rj'&&!e.trash})}
+function checkRq(){
+ if(!window.arAll||!adm())return;
+ window.arAll(function(l){
+  var cur=rqOpen(l),old=rqGet();
+  if(!old){rqSet(cur.map(function(e){return e.sk}));return}
+  var oi={};old.forEach(function(x){oi[x]=1});
+  var nw=cur.filter(function(e){return !oi[e.sk]});if(!nw.length)return;
+  rqSet(old.concat(nw.map(function(e){return e.sk})));
+  var me='';try{me=window.__umUser?window.__umUser():''}catch(e){}
+  nw=nw.filter(function(e){return (e.u||'')!==me});if(!nw.length)return;
+  var who={};nw.forEach(function(e){who[e.u||'مستخدم']=1});
+  say('📥 وصل '+(nw.length>1?(nw.length+' طلبات جديدة'):'طلب جديد')+' من: '+Object.keys(who).join('، '));
+ })}
+setTimeout(function(){var iv=setInterval(function(){if(rqGet()){clearInterval(iv);return}if(adm()&&window.arAll)checkRq()},4000)},30000);
+function arrived(){clearTimeout(chkT);chkT=setTimeout(function(){check();checkRq()},250)}
 setTimeout(function(){if(seenGet()||!window.arAll)return;window.arAll(function(l){if(seenGet())return;seenSet((l||[]).filter(function(e){return e&&e.k==='dfreq'&&e.sk}).map(function(e){return e.sk}))})},30000);
 (function hook(n){var f=window.__arIn;
  if(typeof f==='function'&&!f.__s8){var w=async function(){var r=await f.apply(this,arguments);try{arrived()}catch(e){}return r};w.__s8=1;window.__arIn=w;return}
