@@ -489,7 +489,7 @@ function __v18(){
          sb=false;
         }
        }
-       stm=setTimeout(tick,document.hidden?30000:3000);
+       stm=setTimeout(tick,window.__wsLive?30000:(document.hidden?30000:3000));
       }
       document.addEventListener('visibilitychange',function(){if(!document.hidden&&!dead){clearTimeout(stm);tick()}});
       stm=setTimeout(tick,4000);
@@ -10502,6 +10502,49 @@ function start(){
  document.addEventListener('visibilitychange',function(){if(!document.hidden)syncFrequencyRecords()});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
+
+<script>
+/* ===== [مرحلة6] إشعار فوري للأدمن عبر WebSocket (Cloudflare Durable Object) =====
+   الأدمن بيتصل بـ /api/sync/ws، وأول ما تردد يترفع الـ Worker بيبعت tick فنسحب فورًا.
+   لو الاتصال وقع، الـ polling القديم (كل 3 ثواني) بيرجع يشتغل تلقائي كاحتياطي. */
+(function(){
+ if(!window.__CF)return;
+ var URL_=String(window.__CF).replace(/\/+$/,'').replace(/^http/i,'ws')+'/ws';
+ var ws=null,pingT=null,rt=null,retry=0,connecting=false;
+ window.__wsLive=false;
+ function isAdm(){try{return !!(document.body&&document.body.classList.contains('isadm'))}catch(e){return false}}
+ function pull(){
+  var n=0;(function go(){try{if(window.__lsPollNow&&window.__lsPollNow())return}catch(e){return}if(++n<8)setTimeout(go,500)})();
+  setTimeout(function(){try{window.__lsPollNow&&window.__lsPollNow()}catch(e){}},2500);
+ }
+ function later(){clearTimeout(rt);var d=Math.min(1000*Math.pow(2,retry++),30000);rt=setTimeout(connect,d)}
+ async function connect(){
+  if(connecting||ws)return;
+  if(!isAdm()||!window.__fbTok){clearTimeout(rt);rt=setTimeout(connect,3000);return}
+  connecting=true;
+  var s=null,done=false;
+  function end(){
+   if(done)return;done=true;connecting=false;
+   clearInterval(pingT);if(ws===s)ws=null;window.__wsLive=false;
+   try{s&&s.close()}catch(e){}
+   later();
+  }
+  try{
+   var tok=await window.__fbTok();
+   if(!tok)throw new Error('notok');
+   s=new WebSocket(URL_,['sync.v1','tok.'+tok]);
+   s.onopen=function(){ws=s;connecting=false;retry=0;window.__wsLive=true;pull();clearInterval(pingT);pingT=setInterval(function(){try{s.send('ping')}catch(e){}},30000)};
+   s.onmessage=function(ev){if(ev.data==='pong')return;try{var m=JSON.parse(ev.data);if(m&&m.type==='tick')pull()}catch(e){}};
+   s.onclose=end;s.onerror=end;
+  }catch(e){end()}
+ }
+ document.addEventListener('visibilitychange',function(){
+  if(document.hidden)return;
+  if(ws&&ws.readyState===1){pull()}else{clearTimeout(rt);retry=0;connect()}
+ });
+ setTimeout(connect,3000);
 })();
 </script>
 </body></html>
