@@ -3726,7 +3726,7 @@ function ready(){
  buildChip();
  if(ADMIN){buildTab();buildTile();buildView()}
  hookDocs();applyPerms();lockClicks();
- setInterval(watch,5000);if(ADMIN)adminPull();else{setInterval(refreshMe,300000);document.addEventListener('visibilitychange',function(){if(!document.hidden&&Date.now()-ME_ST.last>60000)refreshMe()})}}
+ setInterval(watch,5000);if(ADMIN)adminPull();else{setInterval(function(){if(!document.hidden)refreshMe()},45000);window.addEventListener('focus',function(){if(Date.now()-ME_ST.last>10000)refreshMe()});document.addEventListener('visibilitychange',function(){if(!document.hidden&&Date.now()-ME_ST.last>10000)refreshMe()})}}
 var lkOn=false;
 function lockClicks(){
  if(lkOn)return;lkOn=true;
@@ -4038,11 +4038,11 @@ function openEditor(u){
    var cur=allUsers().filter(function(x){return x.id===u.id})[0]||u;
    var cands=[],mine=iCP.value.trim();
    if(mine)cands.push(mine);var __sp=pwAll()[cur.id];if(__sp&&__sp.p)cands.push(__sp.p);
-   if(!ROSTERC){
-    var ap=prompt('اكتب كلمة سر الأدمن');if(!ap)return;
-    try{ROSTERC=await window.__openRoster(ap);ADMPW=ap}catch(e){return fail('كلمة سر الأدمن غلط.')}}
+   if(!ROSTERC&&cur.by==='استيراد الموظفين'){
+    var ap=prompt('اكتب كلمة سر الأدمن (لقراءة كلمة سر الموظف الحالية — اتركها فاضية للتخطي)');
+    if(ap){try{ROSTERC=await window.__openRoster(ap);ADMPW=ap}catch(e){return fail('كلمة سر الأدمن غلط.')}}}
    var nk=window.__norm(cur.name);
-   ROSTERC.forEach(function(x){if(window.__norm(x.name)===nk){cands.push(x.pw);(x.old||[]).forEach(function(o){cands.push(o)})}});
+   if(ROSTERC)ROSTERC.forEach(function(x){if(window.__norm(x.name)===nk){cands.push(x.pw);(x.old||[]).forEach(function(o){cands.push(o)})}});
    cands=cands.filter(function(c,i){return c&&cands.indexOf(c)===i});
    bP.disabled=true;er.style.display='none';bP.textContent='⏳ جاري الحفظ…';
    try{
@@ -4050,9 +4050,14 @@ function openEditor(u){
     for(var i=0;i<cands.length&&!tok&&!stop;i++){
      var s1=await fbPost('signInWithPassword',{email:cur.email,password:cands[i],returnSecureToken:true});
      if(s1.ok)tok=s1.j.idToken;else if(/TOO_MANY_ATTEMPTS/.test(fbMsg(s1)))stop=true}
-    if(!tok){bP.disabled=false;bP.textContent='💾 حفظ كلمة السر في Firebase';return fail(stop?'Firebase أوقف المحاولات مؤقتاً، استنى شوية وجرّب تاني.':'مقدرتش أتعرف على كلمة السر الحالية. اكتبها في خانة «الحالية» وجرّب تاني.')}
-    var up=await fbPost('update',{idToken:tok,password:np,returnSecureToken:false});
-    if(!up.ok){bP.disabled=false;bP.textContent='💾 حفظ كلمة السر في Firebase';return fail(/WEAK_PASSWORD/.test(fbMsg(up))?'كلمة السر ضعيفة، استخدم 6 حروف أو أرقام على الأقل.':'تعذر الحفظ: '+fbMsg(up))}
+    var __made=false;
+    if(!tok&&!stop&&cur.email){var __su=await fbPost('signUp',{email:cur.email,password:np,returnSecureToken:false});
+     if(__su.ok)__made=true;
+     else if(/WEAK_PASSWORD/.test(fbMsg(__su))){bP.disabled=false;bP.textContent='💾 حفظ كلمة السر في Firebase';return fail('كلمة السر ضعيفة، استخدم 6 حروف أو أرقام على الأقل.')}}
+    if(!tok&&!__made){bP.disabled=false;bP.textContent='💾 حفظ كلمة السر في Firebase';return fail(stop?'Firebase أوقف المحاولات مؤقتاً، استنى شوية وجرّب تاني.':'الحساب موجود بكلمة سر مش معروفة. اكتب كلمة السر الحالية في خانة «الحالية» وجرّب تاني، أو استخدم «إعادة تعيين بيانات الدخول».')}
+    if(!__made){var up=await fbPost('update',{idToken:tok,password:np,returnSecureToken:false});
+     if(!up.ok){bP.disabled=false;bP.textContent='💾 حفظ كلمة السر في Firebase';return fail(/WEAK_PASSWORD/.test(fbMsg(up))?'كلمة السر ضعيفة، استخدم 6 حروف أو أرقام على الأقل.':'تعذر الحفظ: '+fbMsg(up))}}
+    if(__made)cur.acct=1;
     cur.pwChanged=Date.now();saveUser(cur);pwStore(cur.id,cur.login||cur.username,np,cur.name);syncNow(null,true,[cur]);
     iNP.value='';iCP.value='';bP.disabled=false;bP.textContent='💾 حفظ كلمة السر في Firebase';
     say('✔ تم تغيير كلمة سر «'+(cur.name||cur.username)+'» في Firebase')
@@ -7285,11 +7290,11 @@ function lock(){try{var ck=$('bk-ap');if(!ck)return;if(!isAdm()){ck.checked=true
   if(o.length){try{var _q=parent.__ctrSelf&&parent.__ctrSelf();if(_q)o=o.filter(function(x){return parent.__ctrNorm(x.n)===_q})}catch(_e){}DOCS=o}}catch(e){}
  function parseE(e,out){var d;try{d=new DOMParser().parseFromString(e.h||'','text/html')}catch(x){return}
   if(e.k==='dcsign'){var r=d.getElementById('cs-rec');if(!r||r.getAttribute('data-ok')!=='1')return;var dt=r.getAttribute('data-date');if(!dt)return;
-   out.push({d:dt,n:r.getAttribute('data-name')||'',dp:r.getAttribute('data-dept')||'',j:r.getAttribute('data-job')||'',w:r.getAttribute('data-task')||'',tm:r.getAttribute('data-time')||new Date(e.t||0).toISOString(),s:1,src:'توقيع',ap:e.s==='hf',rj:e.s==='rj'});return}
+   out.push({d:dt,n:r.getAttribute('data-name')||'',dp:r.getAttribute('data-dept')||'',j:r.getAttribute('data-job')||'',w:r.getAttribute('data-task')||'',tm:r.getAttribute('data-time')||new Date(e.t||0).toISOString(),s:1,src:'توقيع',ap:e.s==='hf',rj:e.s==='rj',ids:[e.id]});return}
   if(e.k==='dcatt'){var di=d.getElementById('ca-d'),d2=di?(di.getAttribute('value')||''):'';if(!d2)return;
    [].forEach.call(d.querySelectorAll('tr[data-doc]'),function(r){var st=r.querySelector('td.st'),s=st?+(st.getAttribute('data-s')||0):0;if(!s)return;
     var n=r.querySelector('td.nm'),p=r.querySelector('td.dp'),j=r.querySelector('td.sp'),w=r.querySelector('td.wk select');
-    out.push({d:d2,n:n?n.textContent.trim():'',dp:p?p.textContent.trim():'',j:j?j.textContent.trim():'',w:w?(w.getAttribute('data-v')||''):'',tm:new Date(e.t||0).toISOString(),s:s,src:'كشف يومي',ap:e.s==='hf',rj:e.s==='rj'})})}}
+    out.push({d:d2,n:n?n.textContent.trim():'',dp:p?p.textContent.trim():'',j:j?j.textContent.trim():'',w:w?(w.getAttribute('data-v')||''):'',tm:new Date(e.t||0).toISOString(),s:s,src:'كشف يومي',ap:e.s==='hf',rj:e.s==='rj',ids:[e.id],e:e})})}}
  function opts(sel,items,ph,lab){var cur=sel.value;sel.innerHTML='';var o=D.createElement('option');o.value='';o.textContent=ph;sel.appendChild(o);
   items.forEach(function(x){var e=D.createElement('option');e.value=x;e.textContent=lab?lab(x):x;sel.appendChild(e)});if(cur&&items.indexOf(cur)>-1)sel.value=cur}
  function build(){
@@ -7317,36 +7322,67 @@ function lock(){try{var ck=$('bk-ap');if(!ck)return;if(!isAdm()){ck.checked=true
   $('bk-ch').innerHTML=bars(cap,items)}
  function table(rows){var s=rows.slice().sort(function(a,b){return a.d<b.d?1:a.d>b.d?-1:(a.tm<b.tm?1:-1)}),LIM=400,h;
   if(!s.length){$('bk-tb').innerHTML='<div class="bk-e">لا توجد سجلات حضور مطابقة للاستعلام</div>';return}
-  h='<table class="gd-tb fm-tb bk-t"><thead><tr><th>م</th><th>التاريخ</th><th>اليوم</th><th>وقت التوقيع</th><th>القسم</th><th>الاسم</th><th>الوظيفة</th><th>العمل المكلف به</th><th>الحالة</th><th>المصدر</th></tr></thead><tbody>';
-  s.slice(0,LIM).forEach(function(r,i){h+='<tr'+(r.rj?' style="background:#ffcdd2"':'')+'><td>'+(i+1)+'</td><td>'+fmtD(r.d)+'</td><td>'+dayName(r.d)+'</td><td>'+(r.src==='توقيع'?fmtT(r.tm):'—')+'</td><td class="l">'+esc(r.dp)+'</td><td class="l"><b>'+esc(r.n)+'</b></td><td class="l">'+esc(r.j)+'</td><td>'+esc(r.w||'—')+'</td><td><b>'+STX[r.s]+'</b></td><td>'+r.src+(r.rj?' ❌ مرفوض':(r.ap?' ✔ معتمد':' ⏳'))+'</td></tr>'});
+  h='<table class="gd-tb fm-tb bk-t"><thead><tr><th>م</th><th>التاريخ</th><th>اليوم</th><th>وقت التوقيع</th><th>القسم</th><th>الاسم</th><th>الوظيفة</th><th>العمل المكلف به</th><th>الحالة</th><th>المصدر</th>'+(isAdm()?'<th>إجراء</th>':'')+'</tr></thead><tbody>';
+  s.slice(0,LIM).forEach(function(r,i){h+='<tr'+(r.rj?' style="background:#ffcdd2"':'')+'><td>'+(i+1)+'</td><td>'+fmtD(r.d)+'</td><td>'+dayName(r.d)+'</td><td>'+(r.src==='توقيع'?fmtT(r.tm):'—')+'</td><td class="l">'+esc(r.dp)+'</td><td class="l"><b>'+esc(r.n)+'</b></td><td class="l">'+esc(r.j)+'</td><td>'+esc(r.w||'—')+'</td><td><b>'+STX[r.s]+'</b></td><td>'+r.src+(r.rj?' ❌ مرفوض':(r.ap?' ✔ معتمد':' ⏳'))+'</td>'+(isAdm()?'<td>'+((r.ids&&r.ids.length)?'<button type="button" class="bk-del" data-sh="'+(r.src==='توقيع'?'':'1')+'" data-ids="'+r.ids.join(',')+'" data-n="'+esc(r.n)+'" data-d="'+r.d+'" style="font:inherit;font-weight:900;font-size:9pt;border:2px solid #000;border-radius:999px;padding:0 8px;background:#ff8a80;cursor:pointer">🗑 حذف</button>':'—')+'</td>':'')+'</tr>'});
   h+='</tbody></table>';if(s.length>LIM)h+='<div class="bk-note">المعروض أول '+LIM+' سجل من '+s.length+' — ضيّق الاستعلام لعرض الباقي.</div>';
   $('bk-tb').innerHTML=h}
+ function pdf(){var P=window.parent,lg='';try{lg=P.getComputedStyle(P.document.documentElement).getPropertyValue('--logo').trim()}catch(x){}
+  var rows=filt().slice().sort(function(a,b){return a.d<b.d?1:a.d>b.d?-1:(a.tm<b.tm?1:-1)});
+  if(!rows.length){alert('لا توجد سجلات حضور مطابقة لتصديرها');return}
+  var f=[];if($('bk-m').value)f.push('الشهر: '+monLbl($('bk-m').value));if($('bk-d').value)f.push('التاريخ: '+fmtD($('bk-d').value));if($('bk-dy').value)f.push('اليوم: '+$('bk-dy').value);if($('bk-dp').value)f.push('القسم: '+$('bk-dp').value);if($('bk-n').value)f.push('الاسم: '+$('bk-n').value);
+  var now=new Date(),ds=two(now.getDate())+'/'+two(now.getMonth()+1)+'/'+now.getFullYear()+'  '+two(now.getHours())+':'+two(now.getMinutes());
+  var FT='مع خالص تحياتنا - إدارة النماذج الإلكترونية - السيستم الإلكتروني الموحد - لجنة الإشراف والحوكمة - مستشفى منفلوط النموذجي';
+  var tb='';rows.forEach(function(r,i){tb+='<tr><td>'+(i+1)+'</td><td>'+fmtD(r.d)+'</td><td>'+dayName(r.d)+'</td><td>'+(r.src==='توقيع'?fmtT(r.tm):'—')+'</td><td class="l">'+esc(r.dp)+'</td><td class="l"><b>'+esc(r.n)+'</b></td><td class="l">'+esc(r.j)+'</td><td>'+esc(r.w||'—')+'</td><td><b>'+STX[r.s]+'</b></td><td>'+(r.rj?'مرفوض':(r.ap?'معتمد':'قيد الموافقة'))+'</td></tr>'});
+  var css='@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{margin:0;font-family:Cairo,Tahoma,Arial,sans-serif;direction:rtl;color:#000}table.m{width:100%;border-collapse:collapse}.lh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:3mm}.box{border:2.5px solid #000;border-radius:12px;background:#c6ff1a;font-weight:900;padding:3px 12px;text-align:center;font-size:11pt;line-height:1.5}.lg{width:22mm;height:22mm;border-radius:50%;border:2.5px solid #000;background:#fff '+(lg||'')+' center/cover no-repeat}.ttl{display:block;width:fit-content;margin:2mm auto;background:#c6ff1a;border:2.5px solid #000;border-radius:6px;padding:2px 24px;font-size:15pt;font-weight:900}.fl{text-align:center;font-weight:800;font-size:10pt;margin:1mm 0 2mm}table.d{width:100%;border-collapse:collapse}table.d th{background:#c6ff1a;border:1.5px solid #000;padding:2px;font-size:9.5pt}table.d td{border:1.5px solid #000;padding:2px 3px;font-size:9pt;text-align:center}table.d td.l{text-align:right}table.d tr{page-break-inside:avoid}.ft{margin-top:3mm;background:#00e5ff;border:2.5px solid #000;border-radius:6px;font-weight:900;font-size:9.5pt;text-align:center;padding:3px 8px}.sg{text-align:center;font-size:8.5pt;font-weight:800;margin-top:1mm}thead{display:table-header-group}tfoot{display:table-footer-group}';
+  var h='<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>كشف حضور الأطباء المتعاقدين</title><style>'+css+'</style></head><body><table class="m"><thead><tr><td><div class="lh"><div class="box">مديريه الصحه والسكان بأسيوط<br>مستشفي منفلوط النموذجي</div><div class="lg"></div><div class="box">تاريخ الإصدار<br>'+ds+'</div></div><div class="ttl">كشف حضور الأطباء المتعاقدين</div><div class="fl">'+(f.length?esc(f.join(' — '))+' — ':'')+'عدد السجلات: '+rows.length+'</div></td></tr></thead><tbody><tr><td><table class="d"><thead><tr><th>م</th><th>التاريخ</th><th>اليوم</th><th>وقت التوقيع</th><th>القسم</th><th>الاسم</th><th>الوظيفة</th><th>العمل المكلف به</th><th>الحالة</th><th>القرار</th></tr></thead><tbody>'+tb+'</tbody></table></td></tr></tbody><tfoot><tr><td><div class="ft">'+FT+'</div><div class="sg">الملكية الفكرية والإبداعية محفوظة لمصمم السيستم الإلكتروني الموحد - د. وليد سيد حسانين سيد</div></td></tr></tfoot></table></body></html>';
+  var w=P.open('','_blank');if(!w){alert('اسمح بالنوافذ المنبثقة لتصدير PDF');return}
+  w.document.write(h);w.document.close();setTimeout(function(){try{w.focus();w.print()}catch(x){}},700)}
  function render(){lock();var rows=filt(),pres=rows.filter(function(r){return (r.s===1||r.s===6)&&!r.rj}),nm={},dy={},pdy={};
   pres.forEach(function(r){nm[r.n]=1;dy[r.d]=1;pdy[r.n+'|'+r.d]=1});
   $('bk-note').textContent=(PEND&&($('bk-ap').checked||!isAdm()))?('⏳ '+PEND+' سجل بانتظار اعتماد الأدمن وغير ظاهر'+(isAdm()?' — اعتمدها من اللوحة أعلاه، أو ألغِ «المعتمد فقط» لمعاينتها.':'.')):'';
   $('bk-sum').innerHTML='<span>عدد السجلات: '+rows.length+'</span>'+(rows.some(function(r){return r.rj})?'<span style="background:#ff8a80">❌ مرفوض: '+rows.filter(function(r){return r.rj}).length+'</span>':'')+'<span>الأطباء الحاضرون: '+Object.keys(nm).length+'</span><span>عدد الأيام: '+Object.keys(dy).length+'</span><span>إجمالي أيام الحضور (طبيب/يوم): '+Object.keys(pdy).length+'</span>';
   chart(pres);table(rows)}
  function load(){var P=window.parent;if(!P||!P.arAll){$('bk-note').textContent='تعذر قراءة الأرشيف من هنا';return}
-  P.arAll(function(l){REC=[];PEND=0;PL=[];(l||[]).forEach(function(e){if(!e||!e.h)return;if(e.k!=='dcsign'&&e.k!=='dcatt')return;var b=REC.length;parseE(e,REC);try{var _s=P.__ctrSelf&&P.__ctrSelf();if(_s&&P.__ctrNorm){var _t=REC.splice(b).filter(function(r){return P.__ctrNorm(r.n)===_s});REC.push.apply(REC,_t)}}catch(_x){}if(e.s!=='hf'&&e.s!=='rj'){PEND+=REC.length-b;if(REC.length>b)PL.push({e:e,r:REC.slice(b)})}});PL.sort(function(x,y){return (y.e.t||0)-(x.e.t||0)});build();render();pend()})}
+  P.arAll(function(l){REC=[];PEND=0;PL=[];(l||[]).forEach(function(e){if(!e||!e.h)return;if(e.k!=='dcsign'&&e.k!=='dcatt')return;var b=REC.length;parseE(e,REC);try{var _s=P.__ctrSelf&&P.__ctrSelf();if(_s&&P.__ctrNorm){var _t=REC.splice(b).filter(function(r){return P.__ctrNorm(r.n)===_s});REC.push.apply(REC,_t)}}catch(_x){}if(e.s!=='hf'&&e.s!=='rj'){PEND+=REC.length-b;if(REC.length>b)PL.push({e:e,r:REC.slice(b)})}});PL.sort(function(x,y){return (y.e.t||0)-(x.e.t||0)});
+  (function(){var m={},o=[];function sc(x){return (x.ap||x.rj)?2:0}
+   REC.forEach(function(r){if(r.src!=='توقيع'){o.push(r);return}var k=r.n+'|'+r.d,p=m[k];
+    if(!p){m[k]=r;o.push(r);return}
+    var ids=(p.ids||[]).concat(r.ids||[]);
+    if(sc(r)>sc(p)||(sc(r)===sc(p)&&String(r.tm)>String(p.tm))){r.ids=ids;o[o.indexOf(p)]=r;m[k]=r}else p.ids=ids});REC=o})();
+  build();render();pend()})}
 function sumE(x){var e=x.e,r=x.r,a=r[0];if(e.k==='dcsign')return '✍️ توقيع حضور — <b>'+esc(a.n)+'</b> — '+esc(a.dp)+(a.j?' — '+esc(a.j):'')+(a.w?' — '+esc(a.w):'')+' — '+fmtD(a.d)+' ('+dayName(a.d)+') '+fmtT(a.tm);
  var c={},p=[];r.forEach(function(y){c[y.s]=(c[y.s]||0)+1});[1,6,2,3,4,5].forEach(function(k){if(c[k])p.push(STX[k]+' '+c[k])});
  return '📋 كشف يومي — '+fmtD(a.d)+' ('+dayName(a.d)+') — '+r.length+' طبيب ('+p.join('، ')+')'}
 function pend(){var b=$('bk-pend');if(!b)return;if(!isAdm()){b.innerHTML='';b.style.display='none';return}b.style.display='';
  if(!PL.length){b.innerHTML='<div class="bk-pd bk-pd0">✔ مفيش سجلات حضور بانتظار اعتمادك</div>';return}
  var h='<div class="bk-pd"><div class="bk-pdh"><b>⏳ بانتظار اعتماد الأدمن ('+PL.length+')</b><button type="button" data-a="all">✅ اعتماد الكل</button></div><div class="bk-pl">';
- PL.forEach(function(x,i){h+='<div class="bk-pr"><span class="bk-ps">'+sumE(x)+(x.e.u?' • 👤 '+esc(x.e.u):'')+'</span><span class="bk-pb"><button type="button" data-a="ap" data-i="'+i+'">✅ اعتماد</button><button type="button" class="rj" data-a="rj" data-i="'+i+'">❌ رفض</button></span></div>'});
+ PL.forEach(function(x,i){h+='<div class="bk-pr"><span class="bk-ps">'+sumE(x)+(x.e.u?' • 👤 '+esc(x.e.u):'')+'</span><span class="bk-pb"><button type="button" data-a="ap" data-i="'+i+'">✅ اعتماد</button><button type="button" class="rj" data-a="rj" data-i="'+i+'">❌ رفض</button>'+(x.e.k==='dcsign'?'<button type="button" class="rj" data-a="dl" data-i="'+i+'">🗑 حذف</button>':'')+'</span></div>'});
  b.innerHTML=h+'</div></div>'}
-D.addEventListener('click',function(ev){var b=ev.target&&ev.target.closest?ev.target.closest('#bk-pend button[data-a]'):null;if(!b||!isAdm())return;var a=b.getAttribute('data-a'),P=window.parent;
+D.addEventListener('click',function(ev){var dl=ev.target&&ev.target.closest?ev.target.closest('button.bk-del'):null;
+ if(dl){if(!isAdm())return;var ids=(dl.getAttribute('data-ids')||'').split(',').filter(Boolean).map(Number),P2=window.parent;
+  if(dl.getAttribute('data-sh')){var nm0=dl.getAttribute('data-n'),id0=ids[0],rr=REC.filter(function(x){return x.src==='كشف يومي'&&x.ids&&x.ids[0]===id0&&x.n===nm0})[0];
+   if(!rr||!rr.e||!confirm('حذف توقيع «'+nm0+'» ليوم '+fmtD(dl.getAttribute('data-d'))+' فقط (باقي الأطباء والأيام لن تتأثر)؟'))return;
+   try{var dd2=new DOMParser().parseFromString(rr.e.h,'text/html'),rows=[].slice.call(dd2.querySelectorAll('tr[data-doc]')),hit=rows.filter(function(t){var c=t.querySelector('td.nm');return c&&c.textContent.trim()===nm0})[0];
+    if(!hit)return;hit.remove();
+    var left=[].slice.call(dd2.querySelectorAll('tr[data-doc] td.st')).filter(function(c){return +(c.getAttribute('data-s')||0)}).length;
+    if(!left){P2.arDel(rr.e.id)}else{var ne=Object.assign({},rr.e,{h:'<!DOCTYPE html>\n'+dd2.documentElement.outerHTML});P2.arMove(ne,(rr.e.s==='hf'||rr.e.s==='rj')?rr.e.s:'in')}}catch(z){}
+   setTimeout(load,900);setTimeout(load,2200);return}
+  if(!ids.length||!confirm('حذف توقيع «'+dl.getAttribute('data-n')+'» بتاريخ '+fmtD(dl.getAttribute('data-d'))+' نهائيًا من الأرشيف'+(ids.length>1?' (مع '+(ids.length-1)+' نسخة مكررة)':'')+'؟'))return;
+  ids.forEach(function(id,i){setTimeout(function(){try{P2.arDel(id)}catch(z){}},i*250)});
+  setTimeout(load,ids.length*250+900);setTimeout(load,ids.length*250+2200);return}
+ var b=ev.target&&ev.target.closest?ev.target.closest('#bk-pend button[data-a]'):null;if(!b||!isAdm())return;var a=b.getAttribute('data-a'),P=window.parent;
  if(a==='all'){if(!PL.length)return;if(!confirm('اعتماد كل سجلات الحضور ('+PL.length+') ونقلها لغرفة الحفظ؟'))return;var Q=PL.slice();Q.forEach(function(x,i){setTimeout(function(){try{P.arMove(x.e,'hf')}catch(z){}},i*90)});setTimeout(load,Q.length*90+900);return}
  var x=PL[+b.getAttribute('data-i')];if(!x)return;var a0=x.r[0];
- if(a==='ap'){if(!confirm('اعتماد حضور «'+a0.n+'» بتاريخ '+fmtD(a0.d)+'؟'))return;try{P.arMove(x.e,'hf')}catch(z){}}
+ if(a==='dl'){if(!confirm('حذف توقيع «'+a0.n+'» بتاريخ '+fmtD(a0.d)+' نهائيًا من الأرشيف؟'))return;try{P.arDel(x.e.id)}catch(z){}}
+ else if(a==='ap'){if(!confirm('اعتماد حضور «'+a0.n+'» بتاريخ '+fmtD(a0.d)+'؟'))return;try{P.arMove(x.e,'hf')}catch(z){}}
  else if(a==='rj'){if(!confirm('رفض سجل «'+a0.n+'» بتاريخ '+fmtD(a0.d)+'؟ هيتنقل للمرفوض ومش هيظهر في الدفتر.'))return;try{P.arMove(x.e,'rj')}catch(z){}}
  setTimeout(load,700);setTimeout(load,1800)},true);
  ['bk-m','bk-d','bk-dy','bk-dp','bk-n','bk-ap','bk-cm'].forEach(function(i){var e=$(i);e.addEventListener('change',render);e.addEventListener('input',render)});
  D.addEventListener('click',function(e){var b=e.target&&e.target.closest?e.target.closest('button[id]'):null;if(!b)return;
   if(b.id==='bk-rs'){['bk-m','bk-d','bk-dy','bk-dp','bk-n'].forEach(function(i){$(i).value=''});render()}
-  else if(b.id==='bk-rf')load();else if(b.id==='bk-pr')window.print()},true);
+  else if(b.id==='bk-rf')load();else if(b.id==='bk-pr')window.print();else if(b.id==='bk-pdf')pdf()},true);
  window.__bkRefresh=load;
+ setInterval(function(){try{if(!document.hidden&&isAdm())load()}catch(x){}},6000);
  lock();build();render();load();
 }
 
@@ -7363,7 +7399,7 @@ var SIGN='<div class="gd-ttl">توقيع حضور الطبيب المتعاقد<
 var BOOK='<div class="gd-ttl">دفتر حضور الأطباء المتعاقدين</div>'
 +'<div class="fm-n" contenteditable="false" data-ui="1">استعلم عن الحضور بالشهر أو التاريخ أو اليوم أو الاسم — بيظهر تفصيل الحضور ومقارنة بيانية. المصدر: توقيعات الحضور (وكشوف الحضور اليومية القديمة) المحفوظة في الأرشيف.</div>'
 +'<div class="bk-ctl" contenteditable="false" data-ui="1"><label>الشهر<select id="bk-m"></select></label><label>التاريخ<input type="date" id="bk-d"></label><label>اليوم<select id="bk-dy"></select></label><label>القسم<select id="bk-dp"></select></label><label>الاسم<select id="bk-n"></select></label>'
-+'<label class="bk-ck"><input type="checkbox" id="bk-ap" checked>بعد القرار فقط (معتمد/مرفوض)</label><button type="button" id="bk-rs">↺ مسح الفلاتر</button><button type="button" id="bk-rf">🔄 تحديث</button><button type="button" id="bk-pr">🖨 طباعة</button></div>'
++'<label class="bk-ck"><input type="checkbox" id="bk-ap" checked>بعد القرار فقط (معتمد/مرفوض)</label><button type="button" id="bk-rs">↺ مسح الفلاتر</button><button type="button" id="bk-rf">🔄 تحديث</button><button type="button" id="bk-pr">🖨 طباعة</button><button type="button" id="bk-pdf" style="background:#ffab91">📄 PDF</button></div>'
 +'<div id="bk-pend" contenteditable="false" data-ui="1"></div><div class="bk-note" id="bk-note" contenteditable="false"></div><div class="bk-sum" id="bk-sum" contenteditable="false"></div>'
 +'<div class="fm-u" contenteditable="false">📊 المقارنة البيانية</div>'
 +'<div class="bk-ctl" contenteditable="false" data-ui="1"><label>قارن حسب<select id="bk-cm"><option value="day">الأيام</option><option value="doc">الأطباء</option><option value="dept">الأقسام</option><option value="month">الشهور</option><option value="task">العمل المكلف به</option></select></label></div>'
@@ -7384,9 +7420,13 @@ arAdd=function(k,nm,html){
   try{var d=new DOMParser().parseFromString(html,'text/html');r=d.getElementById('cs-rec');
    if(r&&r.getAttribute('data-ok')==='1'){var p=(r.getAttribute('data-date')||'').split('-');nm='توقيع حضور — '+r.getAttribute('data-name')+' — '+p[2]+'/'+p[1]+'/'+p[0]}}catch(e){}
   if(!(r&&r.getAttribute('data-ok')==='1'))return;
-  var res=_aa(k,nm,html);
-  try{var f=frame('dcsign');if(f&&f.contentWindow&&f.contentWindow.__csReset)f.contentWindow.__csReset()}catch(e){}
-  return res}
+  var __key=r.getAttribute('data-name')+'|'+r.getAttribute('data-date');
+  if(window.__csBusy===__key)return;window.__csBusy=__key;setTimeout(function(){if(window.__csBusy===__key)window.__csBusy=''},4000);
+  arAll(function(l){var dup=(l||[]).some(function(e){if(!e||e.k!=='dcsign'||e.s==='rj'||!e.h)return false;try{var q=new DOMParser().parseFromString(e.h,'text/html').getElementById('cs-rec');return !!q&&q.getAttribute('data-ok')==='1'&&(q.getAttribute('data-name')+'|'+q.getAttribute('data-date'))===__key}catch(x){return false}});
+   if(dup){try{toast('⚠ التوقيع ده متسجل قبل كده لنفس الطبيب ونفس اليوم')}catch(x){}return}
+   _aa(k,nm,html);
+   try{var f=frame('dcsign');if(f&&f.contentWindow&&f.contentWindow.__csReset)f.contentWindow.__csReset()}catch(e){}});
+  return}
  return _aa(k,nm,html)};
 window.addEventListener('click',function(e){
  var t=e.target&&e.target.closest?e.target.closest('#saveBtn'):null;if(!t||window.cur!=='dcsign')return;
@@ -11164,7 +11204,9 @@ window.__ctrSelf=function(){
   var u=A.currentUser();if(!u||u.owner||u.admin)return '';
   var d=(A.currentPerms().docs)||[];
   if(d.indexOf('dcsign')<0||d.indexOf('dcatt')>-1)return '';
-  var k=nk(u.name);return IDX[k]?k:'';
+  var k=nk(u.name);if(IDX[k])return k;
+  if(u.ctr){for(var q=0;q<DATA.length;q++)if(DATA[q][0]===u.ctr)return nk(DATA[q][1])}
+  return '__none__';
  }catch(e){return ''}};
 
 /* ---------- 3) إضافة المتعاقدين كمستخدمين (زرار للأدمن في لوحة المزامنة) — بدون حذف أي مستخدم ---------- */
@@ -11262,4 +11304,21 @@ window.__ctrAutoAdd=async function(force){
 })();
 </script>
 
+<script id="perm-enforce-31">
+/* ===== المرحلة 31: إنفاذ فعلي لصلاحية «الإرسال للأرشيف» (بدل الاكتفاء بإخفاء الزر) — الأدمن والاستثناءات القائمة غير متأثرة ===== */
+(function(){
+if(window.__perm31)return;window.__perm31=1;
+function wrap(n){var f=window.arAdd;
+ if(typeof f!=='function'||!window.__umApi){if(n<60)setTimeout(function(){wrap(n+1)},500);return}
+ if(f.__p31)return;
+ var w=function(k,nm,html){
+  try{var A=window.__umApi,u=A.currentUser();
+   if(u&&!u.owner&&!A.isAdmin()){var p=A.currentPerms(),c=p.cap||{},a=p.act||{};
+    var ok=a.save||c.add||c.legacySave||p.roleHead||c.approve||(k==='shifts'&&A.canShifts());
+    if(!ok){try{toast('🔒 ليس لديك صلاحية الإرسال للأرشيف')}catch(e){}return}}}catch(e){}
+  return f.apply(this,arguments)};
+ w.__p31=1;window.arAdd=w;try{arAdd=w}catch(e){}}
+wrap(0);
+})();
+</script>
 </body></html>
