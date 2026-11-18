@@ -3365,6 +3365,14 @@ window.__saveCur=function(k){
   idbPut(ne,function(id){if(id==null)return;ne.id=id;refresh();delete inflight[ne.sk];pushE(ne);
    toast(to==="rj"?(ne.k==="shifts"?"↩ تم رفض النوبتجيات وإرجاعها للمستخدم في صندوق الوارد":"❌ تم رفض الطلب ونُقل إلى المرفوض"):ne.s==="head"?"✔ اعتمد رئيس القسم — الطلب الآن لدى Admin للاستكمال":to==="hf"?(ne.k==="shifts"?"✔ تم الاعتماد، والنوبتجيات ظهرت دلوقتي في دفاتر النوبتجيات":"✔ تم الاعتماد ونُقل إلى غرفة الحفظ"):(ne.k==="shifts"?"↩ رجعت للوارد واختفت من دفاتر النوبتجيات":"↩ رجع إلى سلة الوارد"))})};
  window.__arSetFreqDate=function(id,nd,cb){if(!document.body.classList.contains("isadm")){toast("تغيير التاريخ للأدمن فقط");return}nd=String(nd||"").trim();var mm=/^(\d{4})-(\d{2})-(\d{2})$/.exec(nd);var dd=mm?new Date(+mm[1],+mm[2]-1,+mm[3]):null;if(!dd||isNaN(dd.getTime())||dd.getMonth()!==+mm[2]-1){toast("التاريخ غير صالح — اكتبه هكذا 2026-10-29");return}idbAll(function(l){var e=l.filter(function(x){return x.id===id})[0];if(!e||e.k!=="dfreq"||!e.h){toast("السجل غير موجود");return}var d=new DOMParser().parseFromString(e.h,"text/html"),i=d.getElementById("dq-d");if(!i){toast("مفيش خانة تاريخ داخل السجل ده");return}i.setAttribute("value",nd);try{i.value=nd}catch(x){}var WDN=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"],dy=d.querySelector(".dq-dyn");if(dy)dy.textContent=WDN[dd.getDay()];var ne=Object.assign({},e,{h:"<!DOCTYPE html>"+String.fromCharCode(10)+d.documentElement.outerHTML,m:Date.now()});if(!ne.sk)ne.sk="ar:"+newId();idbPut(ne,function(id2){if(id2==null)return;ne.id=id2;refresh();delete inflight[ne.sk];pushE(ne);try{window.__fqLive&&window.__fqLive()}catch(x){}toast("✔ اتغيّر تاريخ التسجيل إلى "+nd);if(cb)cb()})})};
+ window.__arSetSwapDates=function(id,dt,rt,cb){var okf=function(v){return !v||/^\d{4}-\d{2}-\d{2}$/.test(v)};dt=String(dt||"").trim();rt=String(rt||"").trim();
+  if(!dt||!okf(dt)||!okf(rt)){toast("التاريخ غير صالح");if(cb)cb(false);return}
+  idbAll(function(l){var e=l.filter(function(x){return x.id===id})[0];if(!e||e.k!=="f_shift_swap"||!e.h){toast("طلب المبادلة غير موجود");if(cb)cb(false);return}
+   var d=new DOMParser().parseFromString(e.h,"text/html");if(!d.querySelector('[data-fk="swapV2"]')){toast("نموذج مبادلة قديم — تعديل التاريخ غير متاح");if(cb)cb(false);return}
+   function st(k,v){var x=d.querySelector('[data-fk="'+k+'"]');if(x)x.textContent=v}
+   st("date",dt);st("c",dt);st("returnDate",rt||"بدون");st("h",rt||dt);
+   var ne=Object.assign({},e,{h:"<!DOCTYPE html>"+String.fromCharCode(10)+d.documentElement.outerHTML,m:Date.now()});if(!ne.sk)ne.sk="ar:"+newId();
+   idbPut(ne,function(id2){if(id2==null){if(cb)cb(false);return}ne.id=id2;refresh();delete inflight[ne.sk];pushE(ne);toast("✔ تم حفظ تاريخ المبادلة");if(cb)cb(true)})})};
  window.arDel=function(id,all){idbAll(function(l){var tg=all?l:l.filter(function(x){return x.id===id});
   pushDel(tg.map(function(x){return x.sk}));
   idbDel(tg.map(function(x){return x.id}),function(){refresh()})})};
@@ -7384,9 +7392,9 @@ function csMain(FB){
    var tr2=D.createElement('tr');tr2.appendChild(th('وقت التوقيع'));var c=D.createElement('td');c.className='tm';c.setAttribute('colspan','3');c.id='cs-time';c.textContent=tx;tr2.appendChild(c);fr.appendChild(tr2);
    tb.textContent='';tb.appendChild(fr);
   }
-  ['cs-day','cs-date','cs-job'].forEach(function(x){el[x].classList.add('cs-ro')});
-  ['cs-name','cs-dept','cs-task'].forEach(function(x){el[x].classList.remove('cs-ro')});
-  [].forEach.call(D.querySelectorAll('.fm-n'),function(n){if(n.textContent.indexOf('اختار اليوم والتاريخ والقسم والاسم')>-1)n.textContent='اليوم والتاريخ بيتحددوا تلقائي. اختار الاسم من القائمة وهيتملى القسم والوظيفة تلقائي من قاعدة تعاقدات، واختار العمل المكلف به، وبعدها اضغط «✅ توقيع وحفظ».'});
+  el['cs-job'].classList.add('cs-ro');
+  ['cs-day','cs-date','cs-name','cs-dept','cs-task'].forEach(function(x){el[x].classList.remove('cs-ro')});el['cs-date'].readOnly=false;el['cs-date'].removeAttribute('readonly');
+  [].forEach.call(D.querySelectorAll('.fm-n'),function(n){if(n.textContent.indexOf('اختار اليوم والتاريخ والقسم والاسم')>-1||n.textContent.indexOf('اليوم والتاريخ بيتحددوا تلقائي')>-1)n.textContent='اليوم والتاريخ بيظهروا بتاريخ النهاردة وتقدر تغيّرهم. اختار الاسم من القائمة وهيتملى القسم والوظيفة تلقائي من قاعدة تعاقدات، واختار العمل المكلف به، وبعدها اضغط «✅ توقيع وحفظ».'});
  }catch(e){}}
  relayout();
  if(!$('cs-css')){var st=D.createElement('style');st.id='cs-css';st.setAttribute('data-ui','1');
@@ -7411,14 +7419,14 @@ function csMain(FB){
  var dt=$('cs-date');
  ensure($('cs-day'),WD,'— اختر اليوم —');
  function autoDate(){var r=$('cs-rec');if(r&&r.getAttribute('data-time'))return;var n=new Date();dt.value=iso(n);$('cs-day').value=WD[n.getDay()]}
- autoDate();dt.readOnly=true;dt.tabIndex=-1;$('cs-day').tabIndex=-1;
+ autoDate();dt.readOnly=false;dt.removeAttribute('readonly');dt.removeAttribute('tabindex');$('cs-day').removeAttribute('tabindex');
  ensure($('cs-dept'),DEPTS,'— اختر القسم —');ensure($('cs-name'),namesOf(''),'— اختر الاسم —');
  ensure($('cs-job'),JOBS,'— اختر الوظيفة —');ensure($('cs-task'),WK,'— اختر العمل المكلف به —');
  function selfInit(){try{if(parent.__ctrSelf&&parent.__ctrSelf()&&DOCS.length===1){setSel($('cs-dept'),DOCS[0].d);$('cs-name').value=DOCS[0].n;setSel($('cs-job'),DOCS[0].j)}}catch(e){}}
  selfInit();
  function val(i){return $(i).value}
   var REQ=[['cs-date','التاريخ'],['cs-day','اليوم'],['cs-dept','القسم'],['cs-name','الاسم'],['cs-job','الوظيفة'],['cs-task','العمل المكلف به']];
- function sync(){var r=$('cs-rec');autoDate();if(dt.value)dt.setAttribute('value',dt.value);
+ function sync(){var r=$('cs-rec');if(dt.value)dt.setAttribute('value',dt.value);
   ['cs-day','cs-dept','cs-name','cs-job','cs-task'].forEach(function(i){mark($(i))});
   var ok=REQ.every(function(x){return !!val(x[0])});
   r.setAttribute('data-date',dt.value||'');r.setAttribute('data-day',$('cs-day').value);r.setAttribute('data-dept',$('cs-dept').value);
@@ -7442,7 +7450,6 @@ function csMain(FB){
    try{parent.document.getElementById('saveBtn').click()}catch(x){}}},true);
  D.addEventListener('input',sync);D.addEventListener('change',sync);
  sync();
- setInterval(function(){try{if(dt.value!==iso(new Date())&&!$('cs-rec').getAttribute('data-time'))sync()}catch(e){}},60000);
 }
 
 /* ---------- كود داخل صفحة «دفتر الحضور» (بيشتغل جوه الـ iframe) ---------- */
@@ -7584,9 +7591,9 @@ D.addEventListener('click',function(ev){var dl=ev.target&&ev.target.closest?ev.t
 /* ---------- تعريف النموذجين ---------- */
 var SG='<div class="fm-sg" contenteditable="false"><div><div class="fm-sgt">توقيع الطبيب</div><div>&nbsp;</div></div><div><div class="fm-sgt">المسئول عن المتابعة</div><div>&nbsp;</div></div><div><div class="fm-sgt">رئيس لجنة الإشراف والحوكمة</div><div>د.وليد سيد حسانين</div></div><div><div class="fm-sgt">مدير المستشفى</div><div>د.أسامه عبد المعطي</div></div></div>';
 var SIGN='<div class="gd-ttl">توقيع حضور الطبيب المتعاقد</div>'
-+'<div class="fm-n" contenteditable="false" data-ui="1">اليوم والتاريخ بيتحددوا تلقائي. اختار الاسم من القائمة وهيتملى القسم والوظيفة تلقائي من قاعدة تعاقدات، واختار العمل المكلف به، وبعدها اضغط «✅ توقيع وحفظ». التوقيع بيتحفظ في الأرشيف (مجمع حضور وانصراف المتعاقدين) وبيظهر في دفتر الحضور بعد القرار (اعتماد أو رفض).</div>'
++'<div class="fm-n" contenteditable="false" data-ui="1">اليوم والتاريخ بيظهروا بتاريخ النهاردة وتقدر تغيّرهم. اختار الاسم من القائمة وهيتملى القسم والوظيفة تلقائي من قاعدة تعاقدات، واختار العمل المكلف به، وبعدها اضغط «✅ توقيع وحفظ». التوقيع بيتحفظ في الأرشيف (مجمع حضور وانصراف المتعاقدين) وبيظهر في دفتر الحضور بعد القرار (اعتماد أو رفض).</div>'
 +'<table class="gd-tb fm-tb cs-t" id="cs-rec" data-ok="0" contenteditable="false"><tbody>'
-+'<tr><th>اليوم</th><td><select id="cs-day" class="cs-s cs-ro"></select></td><th>التاريخ</th><td><input type="date" id="cs-date" class="cs-s cs-ro" readonly></td></tr>'
++'<tr><th>اليوم</th><td><select id="cs-day" class="cs-s"></select></td><th>التاريخ</th><td><input type="date" id="cs-date" class="cs-s"></td></tr>'
 +'<tr><th>الاسم</th><td><select id="cs-name" class="cs-s"></select></td><th>القسم</th><td><select id="cs-dept" class="cs-s"></select></td></tr>'
 +'<tr><th>الوظيفة</th><td><select id="cs-job" class="cs-s cs-ro"></select></td><th>العمل المكلف به / المهام</th><td><select id="cs-task" class="cs-s"></select></td></tr>'
 +'<tr><th>وقت التوقيع</th><td class="tm" colspan="3" id="cs-time">—</td></tr></tbody></table>'
@@ -11707,6 +11714,40 @@ function openHrRequest(e,edit){
  };
  box.appendChild(form);ov.appendChild(box);ov.addEventListener('mousedown',function(ev){if(ev.target===ov)ov.remove()});D.body.appendChild(ov)
 }
+function swapV2Vals(e){
+ try{var d=new DOMParser().parseFromString(e.h||'','text/html');function v(k){var x=d.querySelector('[data-fk="'+k+'"]');return x?x.textContent.replace(/\u00a0/g,' ').trim():''}
+  if(v('swapV2')!=='2')return null;
+  var iso=function(t){return /^\d{4}-\d{2}-\d{2}$/.test(t)?t:''};
+  return {a:v('a'),f:v('f')||v('e'),shift:v('shiftType'),dept1:v('dept1'),dept2:v('dept2'),dateRaw:v('date')||v('c'),date:iso(v('date')||v('c')),ret:iso(v('returnDate')==='بدون'?'':v('returnDate'))}
+ }catch(x){return null}
+}
+function openSwapDates(e){
+ var v=swapV2Vals(e);if(!v)return openRequest(e,true);
+ var ov=el('div','sg-hr-overlay'),box=el('section','sg-hr-box');
+ ov.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.68);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;direction:rtl;color:#000';
+ box.style.cssText='width:min(560px,100%);background:#fff;border:3px solid #000;border-radius:18px;box-shadow:5px 5px 0 #000;padding:14px;font-family:inherit';
+ var h=el('div','sg-head'),x=el('button','sg-close','✖ إغلاق');x.type='button';x.onclick=function(){ov.remove()};h.appendChild(el('b','','📅 إضافة / تعديل تاريخ المبادلة'));h.appendChild(x);box.appendChild(h);
+ box.appendChild(el('div','sg-detail',[v.a&&('القائم بالعمل: '+v.a),v.f&&('المبدل معه: '+v.f),v.shift&&('النوبتجية: '+v.shift)].filter(Boolean).join(' • ')));
+ var form=D.createElement('form'),grid=el('div','sg-hr-grid');grid.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0';
+ var inp={};
+ [['date','تاريخ النوبتجية (مطلوب)',v.date],['ret','تاريخ رد المبادلة (اتركه فاضي لو بدون)',v.ret]].forEach(function(f){
+  var lab=el('label','sg-hr-field',f[1]),i=D.createElement('input');i.type='date';i.value=f[2];
+  lab.style.cssText='display:flex;flex-direction:column;gap:4px;font-weight:800';i.style.cssText='font:inherit;border:2px solid #000;border-radius:8px;padding:7px';
+  lab.appendChild(i);grid.appendChild(lab);inp[f[0]]=i});
+ form.appendChild(grid);
+ if(v.dateRaw&&!v.date)form.appendChild(el('small','sg-meta','التاريخ المسجل حاليًا: '+v.dateRaw+' — اختار التاريخ الصحيح من الخانة'));
+ var save=el('button','sg-act approve','💾 حفظ التاريخ');save.type='submit';form.appendChild(save);
+ form.onsubmit=function(ev){ev.preventDefault();
+  if(!inp.date.value)return say('تاريخ النوبتجية مطلوب');
+  if(inp.ret.value&&inp.ret.value<inp.date.value)return say('تاريخ الرد لازم يكون بعد تاريخ النوبتجية أو يساويه');
+  if(!confirm('حفظ تاريخ المبادلة؟'+(e.s==='hf'?'\nالطلب معتمد — التغيير هيتطبق على دفتر النوبتجيات.':'')))return;
+  if(typeof window.__arSetSwapDates!=='function')return say('الحفظ غير متاح حاليًا');
+  window.__arSetSwapDates(e.id,inp.date.value,inp.ret.value,function(ok){if(!ok)return;ov.remove();
+   try{window.__arDirty=(window.__arDirty||0)+1}catch(z){}
+   [300,900,2000].forEach(function(ms){setTimeout(function(){try{window.__shLedgerApi&&window.__shLedgerApi.refresh()}catch(z){}},ms)});
+   setTimeout(draw,450);setTimeout(draw,1200)})};
+ box.appendChild(form);ov.appendChild(box);ov.addEventListener('mousedown',function(ev){if(ev.target===ov)ov.remove()});D.body.appendChild(ov)
+}
 function moveHrRequest(e,to){
  if(!admin())return say('اعتماد ورفض مبادلات الموارد البشرية للأدمن فقط');
  var r=readHrRequest(e);if(!r)return say('تعذر العثور على طلب المبادلة الأصلي');
@@ -11818,7 +11859,7 @@ function draw(){
    var actions=el('div','sg-actions');actButton(actions,'👁 فتح','view',function(){openRequest(e,false)});
    if(e.k==='f_shift_swap'||e.k==='shifts')actButton(actions,'🖨 طباعة','view',function(){printEntry(e)});
    var p=perms(),owner=norm(e.u)===norm(currentLabel());
-   if(admin()||canReview(e)||(owner&&p.cap&&p.cap.edit))actButton(actions,'✏️ تعديل','edit',function(){openRequest(e,true)});
+   if(admin()||canReview(e)||(owner&&p.cap&&p.cap.edit))actButton(actions,'✏️ تعديل','edit',function(){if(e.k==='f_shift_swap'&&swapV2Vals(e))openSwapDates(e);else openRequest(e,true)});
    if(admin()||(owner&&p.cap&&p.cap.del))actButton(actions,'🗑 حذف','delete',function(){deleteRequest(e)});
    if(canReview(e)&&e.s!=='hf')actButton(actions,'✅ موافقة','approve',function(){moveRequest(e,'hf')});
    if(canReview(e)&&e.s!=='rj'&&(e.s!=='hf'||(admin()&&e.k==='shifts')))actButton(actions,'❌ رفض','reject',function(){moveRequest(e,'rj')});
