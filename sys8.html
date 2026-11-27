@@ -12194,6 +12194,19 @@ function labelInput(root,label,id,type,required){
  var w=el('label','ssv2-field',label),i=D.createElement('input');i.id=id;i.type=type||'text';if(required)i.required=true;
  w.appendChild(i);root.appendChild(w);return i
 }
+var DEPT_OPTS=['أخصائي التمريض','الأطباء البشريين','الصيدلة','العيادة المسائية','الكتابية والخدمات المعاونة','المدراء المناوبين','الوظائف الفنية'];
+function labelDept(root,label,id){
+ var w=el('label','ssv2-field',label),i=D.createElement('select');i.id=id;i.required=true;
+ var o0=el('option','','— اختر القسم —');o0.value='';i.appendChild(o0);
+ DEPT_OPTS.forEach(function(n){var o=el('option','',n);o.value=n;i.appendChild(o)});
+ w.appendChild(i);root.appendChild(w);return i
+}
+function setDept(sel,val){
+ val=String(val||'').trim();
+ if(val){var ok=false;[].forEach.call(sel.options,function(o){if(o.value===val||norm(o.value)===norm(val)){sel.value=o.value;ok=true}});
+  if(!ok){var o=el('option','',val);o.value=val;sel.appendChild(o);sel.value=val}}
+ else sel.value=''
+}
 function infoFor(name){
  var n=norm(name),best=null;
  for(var i=0;i<people.length;i++){if(norm(people[i].name)===n){best=people[i];if(best.job&&best.dept)break}}
@@ -12201,7 +12214,7 @@ function infoFor(name){
 }
 function fillPerson(name,job,dept){
  var p=infoFor(name.value),matched=!!p;
- job.value=p&&p.job||'';dept.value=p&&p.dept||'';
+ job.value=p&&p.job||'';setDept(dept,p&&p.dept||'');
  job.readOnly=!!(p&&p.job);dept.readOnly=!!(p&&p.dept);
  job.placeholder=matched?'الوظيفة من بيانات الموظف':'اكتب الوظيفة إذا كان الاسم جديدًا';
  dept.placeholder=matched?'القسم من بيانات الموظف':'اكتب القسم إذا كان الاسم جديدًا'
@@ -12307,8 +12320,8 @@ function openForm(){
  box.appendChild(el('div','ssv2-intro','أدخل بيانات الطرفين. يُملأ القسم والوظيفة تلقائيًا عند توفرهما في بيانات الموظفين؛ ويمكن إدخالهما يدويًا إذا كان الاسم جديدًا. تاريخ رد المبادلة اختياري، وإذا تُرك فارغًا تُبدّل النوبتجية في التاريخ المحدد للطرفين.'));
  var form=D.createElement('form'),grid=el('div','ssv2-grid'),p1=el('div','ssv2-part'),p2=el('div','ssv2-part');
  p1.appendChild(el('h3','','بيانات الطرف الأول (القائم بالعمل)'));p2.appendChild(el('h3','','بيانات الطرف الثاني (المبدل معه)'));
- var name1=labelInput(p1,'الاسم','ssv2-a','text',true),job1=labelInput(p1,'الوظيفة','ssv2-job1','text',true),dept1=labelInput(p1,'القسم','ssv2-dept1','text',true);
- var name2=labelInput(p2,'الاسم','ssv2-e','text',true),job2=labelInput(p2,'الوظيفة','ssv2-job2','text',true),dept2=labelInput(p2,'القسم','ssv2-dept2','text',true);
+ var name1=labelInput(p1,'الاسم','ssv2-a','text',true),job1=labelInput(p1,'الوظيفة','ssv2-job1','text',true),dept1=labelDept(p1,'القسم','ssv2-dept1');
+ var name2=labelInput(p2,'الاسم','ssv2-e','text',true),job2=labelInput(p2,'الوظيفة','ssv2-job2','text',true),dept2=labelDept(p2,'القسم','ssv2-dept2');
  name1.setAttribute('list','ssv2-people');name2.setAttribute('list','ssv2-people');name1.autocomplete='off';name2.autocomplete='off';
  name1.oninput=function(){fillPerson(name1,job1,dept1)};name1.onchange=name1.oninput;
  name2.oninput=function(){fillPerson(name2,job2,dept2)};name2.onchange=name2.oninput;
